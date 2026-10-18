@@ -11,7 +11,7 @@ import httpx
 from selectolax.lexbor import LexborHTMLParser
 
 from kb_builder.models import CrawlConfig, CrawlManifest, CrawlResult, DiscoveredVia, PageKind, PageRecord
-from kb_builder.services.base import BaseService
+from kb_builder.services.base_service import BaseService
 from kb_builder.urls import (
     DOCUMENT_EXTENSIONS,
     SKIP_EXTENSIONS,

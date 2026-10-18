@@ -22,7 +22,7 @@ from kb_builder.models import (
     PageKind,
     PageRecord,
 )
-from kb_builder.services.base import BaseService
+from kb_builder.services.base_service import BaseService
 
 MANIFEST = "extract.json"
 BOILERPLATE = "boilerplate.md"
