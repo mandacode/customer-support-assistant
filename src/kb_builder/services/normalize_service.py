@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from kb_builder.context import SiteContext
-from kb_builder.grounding import emails, numbers, stems, ungrounded_words
+from kb_builder.grounding import emails, misplaced_numbers, numbers, stems, ungrounded_words
 from kb_builder.llm import LLMClient
 from kb_builder.models import (
     ClassifiedSection,
@@ -49,8 +49,10 @@ class NormalizeService(BaseService[NormalizeResult]):
     """Write the knowledge-base Markdown files, verifying every LLM rewrite.
 
     The LLM only tidies the text of each document group. Its output is accepted
-    only if every number and e-mail address occurs in the source and almost all
-    of its words do; otherwise the file is written from the source text as is.
+    only if every number and e-mail address occurs in the source, every number
+    keeps its source context (no price moved to another row), and almost all of
+    its words occur in the source; otherwise the file is written from the source
+    text as is.
     """
 
     name = "normalize"
@@ -133,6 +135,10 @@ class NormalizeService(BaseService[NormalizeResult]):
         added_numbers = sorted({n for n in numbers(output) if n not in source_numbers})
         if added_numbers:
             problems.append(f"numbers not in source: {', '.join(added_numbers)}")
+
+        misplaced = misplaced_numbers(output, source)
+        if misplaced:
+            problems.append(f"numbers out of their source context: {'; '.join(misplaced[:5])}")
 
         added_emails = sorted(emails(output) - emails(source))
         if added_emails:
