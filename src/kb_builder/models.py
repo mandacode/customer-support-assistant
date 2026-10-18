@@ -190,16 +190,30 @@ class EntityKind(StrEnum):
 
 
 class Entity(BaseModel):
-    id: str = Field(description="Short kebab-case id; replaced by a slug of the name.")
-    name: str
+    """An offering. Built by code from site phrases the LLM selected; never free text."""
+
+    id: str
+    name: str = Field(description="Exactly as written on the site.")
     kind: EntityKind
-    section_ids: list[str] = Field(description="Ids of sections that describe this entity, copied exactly.")
+    candidate_ids: list[str]
+    section_ids: list[str]
 
 
 class ChecklistItem(BaseModel):
     key: str = Field(description="snake_case English key, e.g. 'opening_hours'.")
     question: str = Field(description="A typical customer question, in the site's language.")
     why: str = Field(description="Why customers of this business ask it, one short sentence.")
+
+
+class ProfileDraft(BaseModel):
+    """What the LLM fills in about the company; entities are chosen separately."""
+
+    company_name: str
+    business_type: str = Field(description="What the company is, e.g. 'serwis opon', in the site's language.")
+    audience: Audience
+    language: str = Field(description="ISO 639-1 code of the site's main language.")
+    locations: list[str] = Field(description="Cities or addresses where the company operates, copied from the input.")
+    support_checklist: list[ChecklistItem]
 
 
 class SiteProfile(BaseModel):
@@ -219,6 +233,9 @@ class ProfileConfig(BaseModel):
     max_digest_words: int = Field(4000, ge=200)
     # One call per site that shapes every later stage: worth more thinking.
     reasoning_effort: str = "medium"
+    # Entity selection runs this many times; a choice needs `min_votes` of them.
+    votes: int = Field(5, ge=1)
+    min_votes: int = Field(3, ge=1)
 
 
 class Rejection(BaseModel):

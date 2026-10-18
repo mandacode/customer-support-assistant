@@ -60,12 +60,24 @@ class LLMClient:
         schema: type[T],
         reasoning_effort: str | None = None,
         model: str | None = None,
+        cache_salt: str | None = None,
     ) -> T:
-        """`reasoning_effort` and `model` override the defaults for calls that need more."""
+        """`reasoning_effort` and `model` override the defaults for calls that need more.
+
+        `cache_salt` makes otherwise identical calls separate cache entries, e.g.
+        independent votes on the same question.
+        """
         model = model or self.settings.chat_model
         effort = reasoning_effort or self.settings.reasoning_effort
         key = _hash(
-            {"model": model, "effort": effort, "system": system, "user": user, "schema": schema.model_json_schema()}
+            {
+                "model": model,
+                "effort": effort,
+                "system": system,
+                "user": user,
+                "schema": schema.model_json_schema(),
+                **({"salt": cache_salt} if cache_salt else {}),
+            }
         )
         cached = self._read("chat", key)
         if cached is not None:

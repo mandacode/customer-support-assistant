@@ -1,20 +1,34 @@
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from kb_builder.candidates import Candidate, extract_candidates
 from kb_builder.context import SiteContext
-from kb_builder.grounding import fold, is_grounded
+from kb_builder.entity_votes import SELECTION_PROMPT, aggregate, render_candidates, selection_schema
+from kb_builder.grounding import is_grounded
 from kb_builder.llm import LLMClient
-from kb_builder.models import ExtractManifest, ProfileConfig, ProfileResult, Rejection, Section, SiteProfile
+from kb_builder.models import (
+    Entity,
+    ExtractManifest,
+    ProfileConfig,
+    ProfileDraft,
+    ProfileResult,
+    Rejection,
+    Section,
+    SiteProfile,
+)
 from kb_builder.services.base_service import BaseService
 from kb_builder.services.segment_service import SECTIONS, read_sections
 
 PROFILE = "profile.json"
 REJECTED = "rejected.json"
-
-# Share of an entity name's words that must occur in its own sections.
-ENTITY_NAME_RATIO = 0.5
+CANDIDATES = "candidates.json"
+VOTES = "votes.json"
 DIGEST = "digest.txt"
+
+# Share of the business type's words that must occur in the site text.
+BUSINESS_TYPE_RATIO = 0.5
 
 # JSON-LD types that describe the business itself.
 BUSINESS_TYPES = {"Organization", "LocalBusiness", "Corporation", "Store", "AutoRepair", "ProfessionalService"}
@@ -30,15 +44,6 @@ Rules:
 - Write every human-readable field in the site's main language.
 - company_name: the brand name only, without slogans or city taglines from the page title.
 
-entities - the distinct products, product lines and services a customer could ask about:
-- One entity per offering. Do not merge different services into one entity
-  (e.g. "sensor servicing" and "selling bolts" are two entities).
-- Include the core service even if it is only mentioned in passing or in the price list.
-- Not slogans, values or generic claims ("profesjonalna obsługa" is not an entity).
-- Named product families (e.g. FALCON) are product_line.
-- section_ids: every section that describes the entity, its prices or its parameters,
-  copied exactly from the digest. Price-list sections belong to the services they price.
-
 support_checklist - 12-15 questions customers of THIS type of business typically ask
 support, based on how such businesses work, NOT on what this site happens to say:
 - Cover practical topics: opening hours, prices, waiting/lead time, booking, payment
@@ -50,7 +55,14 @@ support, based on how such businesses work, NOT on what this site happens to say
 
 
 class ProfileService(BaseService[ProfileResult]):
-    """Ask the LLM what the company is, what it offers and what its customers ask."""
+    """Describe the company, its offerings and what its customers ask.
+
+    Company fields and the support checklist come from one LLM call, checked
+    against the site text. Offerings are never written by the model: code lists
+    candidate phrases from the site, the model only selects and groups them by
+    id (several independent votes), and code builds the entities from the
+    candidates the votes agree on.
+    """
 
     name = "profile"
 
@@ -78,10 +90,17 @@ class ProfileService(BaseService[ProfileResult]):
         (out_dir / DIGEST).write_text(digest)
         self.logger.info("digest: %d sections, %d words", len(sections), _words(digest))
 
-        profile = self.llm.parse(
-            system=SYSTEM_PROMPT, user=digest, schema=SiteProfile, reasoning_effort=self.config.reasoning_effort
+        draft = self.llm.parse(
+            system=SYSTEM_PROMPT, user=digest, schema=ProfileDraft, reasoning_effort=self.config.reasoning_effort
         )
-        profile, rejected = self._ground(profile, sections, digest)
+        draft, rejected = self._ground(draft, digest)
+
+        candidates = extract_candidates(sections, extract)
+        (out_dir / CANDIDATES).write_text(
+            json.dumps([c.model_dump(mode="json") for c in candidates], indent=2, ensure_ascii=False)
+        )
+        entities = self._select_entities(digest, candidates, out_dir)
+        profile = SiteProfile(**draft.model_dump(), entities=entities)
 
         (out_dir / PROFILE).write_text(profile.model_dump_json(indent=2))
         (out_dir / REJECTED).write_text(
@@ -102,65 +121,66 @@ class ProfileService(BaseService[ProfileResult]):
                 return text
             snippet = max(5, snippet // 2)
 
-    def _ground(
-        self, profile: SiteProfile, sections: list[Section], digest: str
-    ) -> tuple[SiteProfile, list[Rejection]]:
-        """Keep only what the site text supports; everything removed is reported.
+    def _select_entities(self, digest: str, candidates: list[Candidate], out_dir: Path) -> list[Entity]:
+        if not candidates:
+            return []
+        schema = selection_schema([c.id for c in candidates])
+        prompt = f"{digest}\n{render_candidates(candidates)}\n"
 
-        Checks are deterministic (no LLM): names and places must occur in the
-        source text. The checklist is exempt: its questions are meant to go
-        beyond the site and never become knowledge-base facts.
+        def vote(index: int):
+            return self.llm.parse(
+                system=SELECTION_PROMPT,
+                user=prompt,
+                schema=schema,
+                reasoning_effort=self.config.reasoning_effort,
+                cache_salt=f"vote-{index}",
+            )
+
+        with ThreadPoolExecutor(max_workers=self.config.votes) as pool:
+            selections = list(pool.map(vote, range(1, self.config.votes + 1)))
+
+        entities, summary = aggregate(selections, candidates, min(self.config.min_votes, self.config.votes))
+        (out_dir / VOTES).write_text(
+            json.dumps(
+                {
+                    "selections": [s.model_dump(mode="json") for s in selections],
+                    "summary": summary.model_dump(),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        by_id = {c.id: c.text for c in candidates}
+        for cid, n in summary.candidate_votes.items():
+            if n < summary.min_votes:
+                self.logger.info("  not enough votes (%d/%d): %s", n, summary.runs, by_id[cid])
+        return entities
+
+    def _ground(self, draft: ProfileDraft, digest: str) -> tuple[ProfileDraft, list[Rejection]]:
+        """Keep only company fields the site text supports; everything removed is reported.
+
+        Checks are deterministic (no LLM). The checklist is exempt: its questions
+        are meant to go beyond the site and never become knowledge-base facts.
         """
         rejected: list[Rejection] = []
-        texts = {s.id: s.text for s in sections}
-
-        if not is_grounded(profile.company_name, digest):
-            rejected.append(Rejection(field="company_name", value=profile.company_name, reason="not in site text"))
-            profile.company_name = ""
-        if not is_grounded(profile.business_type, digest, ENTITY_NAME_RATIO):
-            rejected.append(Rejection(field="business_type", value=profile.business_type, reason="not in site text"))
-            profile.business_type = ""
+        if not is_grounded(draft.company_name, digest):
+            rejected.append(Rejection(field="company_name", value=draft.company_name, reason="not in site text"))
+            draft.company_name = ""
+        if not is_grounded(draft.business_type, digest, BUSINESS_TYPE_RATIO):
+            rejected.append(Rejection(field="business_type", value=draft.business_type, reason="not in site text"))
+            draft.business_type = ""
 
         kept_locations = []
-        for location in profile.locations:
+        for location in draft.locations:
             if is_grounded(location, digest):
                 kept_locations.append(location)
             else:
                 rejected.append(Rejection(field="locations", value=location, reason="not in site text"))
-        profile.locations = kept_locations
+        draft.locations = kept_locations
 
-        kept_entities = []
-        for entity in profile.entities:
-            # The digest shows ids as `[id]`; models sometimes copy the brackets.
-            entity.section_ids = [i.strip().strip("[]`").strip() for i in entity.section_ids]
-            unknown = [i for i in entity.section_ids if i not in texts]
-            if unknown:
-                rejected.append(
-                    Rejection(field="entity.section_ids", value=", ".join(unknown), reason=f"no such section ({entity.name})")
-                )
-            entity.section_ids = [i for i in entity.section_ids if i in texts]
-            source = "\n".join(texts[i] for i in entity.section_ids)
-            if not entity.section_ids:
-                rejected.append(Rejection(field="entity", value=entity.name, reason="no source section"))
-            elif not is_grounded(entity.name, source, ENTITY_NAME_RATIO):
-                rejected.append(Rejection(field="entity", value=entity.name, reason="name not in its sections"))
-            else:
-                kept_entities.append(entity)
-        profile.entities = kept_entities
-
-        seen: set[str] = set()
-        for entity in profile.entities:
-            # Derived from the name, not trusted from the model (which misspells ids).
-            base = _slug(entity.name) or "entity"
-            slug, n = base, 2
-            while slug in seen:
-                slug, n = f"{base}-{n}", n + 1
-            entity.id = slug
-            seen.add(slug)
-
-        for item in profile.support_checklist:
+        for item in draft.support_checklist:
             item.key = re.sub(r"[^a-z0-9]+", "_", item.key.lower()).strip("_")
-        return profile, rejected
+        return draft, rejected
 
 
 def _render_digest(site: str, sections: list[Section], extract: ExtractManifest, snippet_words: int) -> str:
@@ -221,7 +241,3 @@ def _compact(item: dict) -> dict:
 
 def _words(text: str) -> int:
     return len(re.findall(r"\w+", text))
-
-
-def _slug(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", fold(text)).strip("-")[:40]
