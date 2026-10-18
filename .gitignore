@@ -17,3 +17,6 @@ __pycache__/
 
 # Scraper cache
 data/
+
+# Generated knowledge base
+knowledge_base/

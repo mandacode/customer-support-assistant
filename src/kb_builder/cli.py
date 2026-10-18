@@ -3,11 +3,13 @@ from pathlib import Path
 
 import typer
 
+from kb_builder.candidates import extract_candidates
 from kb_builder.context import SiteContext
 from kb_builder.models import (
     ClassifyConfig,
     CrawlConfig,
     ExtractConfig,
+    ExtractManifest,
     MergeConfig,
     NormalizeConfig,
     ProfileConfig,
@@ -24,6 +26,7 @@ from kb_builder.services import (
     ProfileService,
     SegmentService,
 )
+from kb_builder.services.segment_service import SECTIONS, read_sections
 
 app = typer.Typer(help="Build a customer-support knowledge base from a website.")
 
@@ -122,6 +125,24 @@ def normalize(
 ) -> None:
     """Write knowledge-base Markdown files, verifying every LLM rewrite against the source."""
     _run_stage(NormalizeService(NormalizeConfig(min_word_coverage=min_word_coverage)), _context(site, data))
+
+
+@app.command()
+def candidates(
+    site: str = typer.Argument(..., help="Site name or URL, e.g. art-mat.com.pl"),
+    data: Path = DATA_OPTION,
+) -> None:
+    """List entity candidates found in the site text (no LLM), for review."""
+    context = _context(site, data)
+    sections_path = context.segmented_dir / SECTIONS
+    if not sections_path.exists():
+        typer.secho(f"No {sections_path}; run `kb segment` first.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    extract = ExtractManifest.model_validate_json((context.extracted_dir / "extract.json").read_text())
+    for candidate in extract_candidates(read_sections(sections_path), extract):
+        kinds = ",".join(candidate.kinds)
+        sections = ", ".join(sid.split("#")[-1][:28] for sid in candidate.section_ids)
+        typer.echo(f"{candidate.id}  {candidate.text:<42} {kinds:<22} {sections}")
 
 
 def _context(site_or_url: str, data: Path) -> SiteContext:
