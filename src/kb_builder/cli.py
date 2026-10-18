@@ -3,8 +3,8 @@ from pathlib import Path
 
 import typer
 
-from kb_builder.models import CrawlConfig, ExtractConfig
-from kb_builder.services import CrawlService, ExtractService
+from kb_builder.models import CrawlConfig, ExtractConfig, SegmentConfig
+from kb_builder.services import CrawlService, ExtractService, SegmentService
 
 app = typer.Typer(help="Build a customer-support knowledge base from a website.")
 
@@ -50,6 +50,25 @@ def extract(
     typer.echo(f"\nSite: {result.site}  ->  {result.out_dir}")
     typer.echo("  " + ", ".join(f"{key}: {n}" for key, n in result.counts().items()))
     typer.echo(f"  manifest: {result.out_dir / 'extract.json'}")
+
+
+
+@app.command()
+def segment(
+    site: str = typer.Argument(..., help="Site folder name, e.g. art-mat.com.pl"),
+    extracted: Path = typer.Option(Path("data/extracted"), help="Root directory of extracted Markdown."),
+    out: Path = typer.Option(Path("data/segmented"), help="Root directory for sections."),
+    max_words: int = typer.Option(500, help="Split sections longer than this."),
+) -> None:
+    """Split extracted pages into heading-based sections."""
+    extracted_dir = extracted / site
+    if not (extracted_dir / "extract.json").exists():
+        raise typer.BadParameter(f"No extract.json in {extracted_dir}; run `kb extract` first.", param_hint="site")
+    result = SegmentService(extracted_dir, out, SegmentConfig(max_words=max_words)).run()
+
+    typer.echo(f"\nSite: {result.site}  ->  {result.out_dir}")
+    typer.echo("  " + ", ".join(f"{key}: {n}" for key, n in result.counts().items()))
+    typer.echo(f"  sections: {result.out_dir / 'sections.jsonl'}")
 
 
 if __name__ == "__main__":

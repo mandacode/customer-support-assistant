@@ -122,3 +122,54 @@ class ExtractResult(BaseModel):
             for flag in page.flags:
                 counts[flag] = counts.get(flag, 0) + 1
         return counts
+
+
+class SectionSource(StrEnum):
+    PAGE = "page"
+    BOILERPLATE = "boilerplate"
+
+
+class SegmentConfig(BaseModel):
+    # Deeper headings are usually styled table cells or labels, not sections.
+    max_heading_level: int = Field(3, ge=1, le=6)
+    # Sections with less body text are merged into the next one.
+    min_words: int = Field(25, ge=0)
+    # Longer sections are split on paragraph boundaries.
+    max_words: int = Field(500, ge=50)
+
+
+class Section(BaseModel):
+    id: str
+    source: SectionSource
+    page_url: str
+    page_file: str
+    page_title: str | None = None
+    heading: str | None = None
+    heading_path: list[str] = Field(default_factory=list)
+    order: int
+    part: int = 1
+    text: str
+    word_count: int
+    sha256: str
+
+
+class SegmentManifest(BaseModel):
+    site: str
+    segmented_at: datetime
+    pages: int
+    sections: int
+    skipped_pages: list[str]
+
+
+class SegmentResult(BaseModel):
+    site: str
+    out_dir: Path
+    sections: list[Section]
+    skipped_pages: list[str]
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "pages": len({s.page_url for s in self.sections}),
+            "sections": len(self.sections),
+            "skipped_pages": len(self.skipped_pages),
+        }
