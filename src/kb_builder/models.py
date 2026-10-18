@@ -329,9 +329,16 @@ class MergeResult(StageResult):
 
 
 class NormalizeConfig(BaseModel):
-    # Restructuring tables (e.g. which price list is for which vehicle) is beyond
-    # gpt-5-nano; the default model stays for every other stage.
-    model: str | None = "gpt-5-mini-2025-08-07"
+    # Plain text goes to the default (cheapest) model. Documents dense with numbers
+    # (price lists, specifications) go to `table_model`: gpt-5-nano attaches price
+    # tables to the wrong heading, an error no deterministic check can see.
+    model: str | None = None
+    table_model: str = "gpt-5-mini-2025-08-07"
+    # A document is treated as tabular above this share of number tokens.
+    table_number_share: float = Field(0.1, gt=0, le=1)
+    # If an output fails verification, retry once with this model before
+    # falling back to the source text.
+    retry_model: str | None = "gpt-5-mini-2025-08-07"
     reasoning_effort: str = "medium"
     # Share of the output's meaningful words that must occur in the source text.
     min_word_coverage: float = Field(0.9, gt=0, le=1)
@@ -346,6 +353,8 @@ class DocumentReport(BaseModel):
     id: str
     file: str
     normalized: bool
+    model: str | None = None
+    # Problems of every rejected attempt, e.g. a failed cheap model before the retry.
     problems: list[str] = Field(default_factory=list)
     dropped_numbers: list[str] = Field(default_factory=list)
 

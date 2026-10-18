@@ -13,6 +13,7 @@ from kb_builder.models import (
     NormalizedDocument,
     NormalizeResult,
     SiteProfile,
+    Topic,
 )
 from kb_builder.services.base_service import BaseService
 from kb_builder.services.classify_service import CLASSIFIED, read_classified
@@ -88,7 +89,9 @@ class NormalizeService(BaseService[NormalizeResult]):
             report = self._write_document(context, document, members, profile)
             reports.append(report)
             status = "ok" if report.normalized else "FALLBACK"
-            self.logger.info("  %-8s %-45s %s", status, document.id, "; ".join(report.problems))
+            self.logger.info(
+                "  %-8s %-45s %-22s %s", status, document.id, report.model or "-", "; ".join(report.problems)
+            )
 
         context.normalized_dir.mkdir(parents=True, exist_ok=True)
         (context.normalized_dir / REPORT).write_text(
@@ -104,29 +107,56 @@ class NormalizeService(BaseService[NormalizeResult]):
         profile: SiteProfile,
     ) -> DocumentReport:
         source = "\n\n".join(section.text for section in members)
-        output = self.llm.parse(
-            system=SYSTEM_PROMPT,
-            user=self._prompt(document, profile, source),
-            schema=NormalizedDocument,
-            reasoning_effort=self.config.reasoning_effort,
-            model=self.config.model,
-        )
-        problems = self._verify(f"{output.title}\n{output.body_markdown}", source)
+        prompt = self._prompt(document, profile, source)
 
-        if problems:
+        attempts = [self._model_for(document, source)]
+        if self.config.retry_model and self.config.retry_model not in attempts:
+            attempts.append(self.config.retry_model)
+
+        problems: list[str] = []
+        accepted: NormalizedDocument | None = None
+        used_model: str | None = None
+        for model in attempts:
+            output = self.llm.parse(
+                system=SYSTEM_PROMPT,
+                user=prompt,
+                schema=NormalizedDocument,
+                reasoning_effort=self.config.reasoning_effort,
+                model=model,
+            )
+            failed = self._verify(f"{output.title}\n{output.body_markdown}", source)
+            if not failed:
+                accepted, used_model = output, model
+                break
+            problems += [f"[{model or 'default'}] {problem}" for problem in failed]
+
+        if accepted is None:
             title, body = document.title, source
         else:
-            title, body = output.title.strip(), _fix_tables(output.body_markdown.strip())
+            title, body = accepted.title.strip(), _fix_tables(accepted.body_markdown.strip())
 
         file = f"{document.id}.md"
         path = context.kb_dir / file
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(_front_matter(document, title, normalized=not problems) + f"# {title}\n\n{body}\n")
+        path.write_text(_front_matter(document, title, normalized=accepted is not None) + f"# {title}\n\n{body}\n")
 
         dropped = sorted(set(numbers(source)) - set(numbers(body)), key=lambda n: (len(n), n))
         return DocumentReport(
-            id=document.id, file=file, normalized=not problems, problems=problems, dropped_numbers=dropped
+            id=document.id,
+            file=file,
+            normalized=accepted is not None,
+            model=used_model or (None if accepted is None else self.llm.settings.chat_model),
+            problems=problems,
+            dropped_numbers=dropped,
         )
+
+    def _model_for(self, document: DocumentGroup, source: str) -> str | None:
+        """Cheap default model for prose; the table model for number-dense documents."""
+        tokens = re.findall(r"\w+", source)
+        share = sum(t.isdigit() for t in tokens) / len(tokens) if tokens else 0.0
+        if document.topic == Topic.PRICING or share >= self.config.table_number_share:
+            return self.config.table_model
+        return self.config.model
 
     def _verify(self, output: str, source: str) -> list[str]:
         """Deterministic checks that the output adds nothing the source does not say."""
