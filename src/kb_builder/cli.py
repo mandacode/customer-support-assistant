@@ -3,8 +3,8 @@ from pathlib import Path
 
 import typer
 
-from kb_builder.models import CrawlConfig
-from kb_builder.services import CrawlService
+from kb_builder.models import CrawlConfig, ExtractConfig
+from kb_builder.services import CrawlService, ExtractService
 
 app = typer.Typer(help="Build a customer-support knowledge base from a website.")
 
@@ -32,6 +32,24 @@ def crawl(
     typer.echo(f"\nSite: {result.site}  ->  {result.out_dir}")
     typer.echo("  " + ", ".join(f"{kind}: {n}" for kind, n in result.counts().items()))
     typer.echo(f"  manifest: {result.out_dir / 'crawl.json'}")
+
+
+@app.command()
+def extract(
+    site: str = typer.Argument(..., help="Site folder name in the raw cache, e.g. art-mat.com.pl"),
+    raw: Path = typer.Option(Path("data/raw"), help="Root directory of the raw cache."),
+    out: Path = typer.Option(Path("data/extracted"), help="Root directory for extracted Markdown."),
+    thin_words: int = typer.Option(40, help="Pages with fewer words are flagged as thin."),
+) -> None:
+    """Convert cached pages to clean Markdown and flag junk pages."""
+    raw_dir = raw / site
+    if not (raw_dir / "crawl.json").exists():
+        raise typer.BadParameter(f"No crawl.json in {raw_dir}; run `kb crawl` first.", param_hint="site")
+    result = ExtractService(raw_dir, out, ExtractConfig(thin_words=thin_words)).run()
+
+    typer.echo(f"\nSite: {result.site}  ->  {result.out_dir}")
+    typer.echo("  " + ", ".join(f"{key}: {n}" for key, n in result.counts().items()))
+    typer.echo(f"  manifest: {result.out_dir / 'extract.json'}")
 
 
 if __name__ == "__main__":
