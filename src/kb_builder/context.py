@@ -31,3 +31,7 @@ class SiteContext(BaseModel):
     @property
     def segmented_dir(self) -> Path:
         return self.data_root / "segmented" / self.site
+
+    @property
+    def profile_dir(self) -> Path:
+        return self.data_root / "profile" / self.site

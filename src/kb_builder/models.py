@@ -175,3 +175,65 @@ class SegmentResult(StageResult):
             "sections": len(self.sections),
             "skipped_pages": len(self.skipped_pages),
         }
+
+
+class Audience(StrEnum):
+    B2B = "b2b"
+    B2C = "b2c"
+    BOTH = "both"
+
+
+class EntityKind(StrEnum):
+    PRODUCT = "product"
+    PRODUCT_LINE = "product_line"
+    SERVICE = "service"
+
+
+class Entity(BaseModel):
+    id: str = Field(description="Short kebab-case id; replaced by a slug of the name.")
+    name: str
+    kind: EntityKind
+    section_ids: list[str] = Field(description="Ids of sections that describe this entity, copied exactly.")
+
+
+class ChecklistItem(BaseModel):
+    key: str = Field(description="snake_case English key, e.g. 'opening_hours'.")
+    question: str = Field(description="A typical customer question, in the site's language.")
+    why: str = Field(description="Why customers of this business ask it, one short sentence.")
+
+
+class SiteProfile(BaseModel):
+    company_name: str
+    business_type: str = Field(description="What the company is, e.g. 'serwis opon', in the site's language.")
+    audience: Audience
+    language: str = Field(description="ISO 639-1 code of the site's main language.")
+    locations: list[str] = Field(description="Cities or addresses where the company operates, copied from the input.")
+    entities: list[Entity]
+    support_checklist: list[ChecklistItem]
+
+
+class ProfileConfig(BaseModel):
+    # Words taken from the start of each section for the digest sent to the LLM.
+    snippet_words: int = Field(40, ge=5)
+    # Upper bound for the whole digest; snippets shrink to fit.
+    max_digest_words: int = Field(4000, ge=200)
+    # One call per site that shapes every later stage: worth more thinking.
+    reasoning_effort: str = "medium"
+
+
+class Rejection(BaseModel):
+    field: str
+    value: str
+    reason: str
+
+
+class ProfileResult(StageResult):
+    profile: SiteProfile
+    rejected: list[Rejection]
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "entities": len(self.profile.entities),
+            "checklist": len(self.profile.support_checklist),
+            "rejected": len(self.rejected),
+        }

@@ -4,9 +4,9 @@ from pathlib import Path
 import typer
 
 from kb_builder.context import SiteContext
-from kb_builder.models import CrawlConfig, ExtractConfig, SegmentConfig
+from kb_builder.models import CrawlConfig, ExtractConfig, ProfileConfig, SegmentConfig
 from kb_builder.pipeline import Pipeline, PipelineError, build_pipeline
-from kb_builder.services import BaseService, CrawlService, ExtractService, SegmentService
+from kb_builder.services import BaseService, CrawlService, ExtractService, ProfileService, SegmentService
 
 app = typer.Typer(help="Build a customer-support knowledge base from a website.")
 
@@ -66,6 +66,16 @@ def segment(
 ) -> None:
     """Split extracted pages into heading-based sections."""
     _run_stage(SegmentService(SegmentConfig(max_words=max_words)), _context(site, data))
+
+
+@app.command()
+def profile(
+    site: str = typer.Argument(..., help="Site name or URL, e.g. art-mat.com.pl"),
+    data: Path = DATA_OPTION,
+    snippet_words: int = typer.Option(40, help="Opening words of each section sent to the LLM."),
+) -> None:
+    """Ask the LLM for the site profile: business, entities, support checklist."""
+    _run_stage(ProfileService(ProfileConfig(snippet_words=snippet_words)), _context(site, data))
 
 
 def _context(site_or_url: str, data: Path) -> SiteContext:

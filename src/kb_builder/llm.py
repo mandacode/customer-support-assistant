@@ -52,8 +52,11 @@ class LLMClient:
             self._client = OpenAI()
         return self._client
 
-    def parse[T: BaseModel](self, *, system: str, user: str, schema: type[T]) -> T:
-        model, effort = self.settings.chat_model, self.settings.reasoning_effort
+    def parse[T: BaseModel](
+        self, *, system: str, user: str, schema: type[T], reasoning_effort: str | None = None
+    ) -> T:
+        """`reasoning_effort` overrides the default for calls that need more thinking."""
+        model, effort = self.settings.chat_model, reasoning_effort or self.settings.reasoning_effort
         key = _hash(
             {"model": model, "effort": effort, "system": system, "user": user, "schema": schema.model_json_schema()}
         )

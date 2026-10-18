@@ -200,6 +200,10 @@ class SegmentService(BaseService[SegmentResult]):
         return parts
 
 
+def read_sections(path: Path) -> list[Section]:
+    return [Section.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()]
+
+
 def _words(text: str) -> int:
     return len(re.findall(r"\w+", text))
 
