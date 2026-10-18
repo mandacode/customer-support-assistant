@@ -237,3 +237,41 @@ class ProfileResult(StageResult):
             "checklist": len(self.profile.support_checklist),
             "rejected": len(self.rejected),
         }
+
+
+class Topic(StrEnum):
+    OFFERING = "offering"
+    PRICING = "pricing"
+    CONTACT = "contact"
+    COMPANY = "company"
+    PROCESS = "process"
+    POLICY = "policy"
+    DOMAIN_KNOWLEDGE = "domain_knowledge"
+    PORTFOLIO = "portfolio"
+    NOISE = "noise"
+
+
+class ClassifyConfig(BaseModel):
+    batch_size: int = Field(8, ge=1)
+    # Longer section texts are cut for the prompt; the full text is kept on disk.
+    max_section_words: int = Field(300, ge=50)
+    reasoning_effort: str = "low"
+
+
+class ClassifiedSection(Section):
+    topic: Topic | None = None
+    entity_ids: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class ClassifyResult(StageResult):
+    sections: list[ClassifiedSection]
+    rejected: list[Rejection]
+
+    def counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for section in self.sections:
+            key = section.topic or "unclassified"
+            counts[key] = counts.get(key, 0) + 1
+        counts["rejected"] = len(self.rejected)
+        return counts

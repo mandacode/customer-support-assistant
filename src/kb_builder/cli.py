@@ -4,9 +4,16 @@ from pathlib import Path
 import typer
 
 from kb_builder.context import SiteContext
-from kb_builder.models import CrawlConfig, ExtractConfig, ProfileConfig, SegmentConfig
+from kb_builder.models import ClassifyConfig, CrawlConfig, ExtractConfig, ProfileConfig, SegmentConfig
 from kb_builder.pipeline import Pipeline, PipelineError, build_pipeline
-from kb_builder.services import BaseService, CrawlService, ExtractService, ProfileService, SegmentService
+from kb_builder.services import (
+    BaseService,
+    ClassifyService,
+    CrawlService,
+    ExtractService,
+    ProfileService,
+    SegmentService,
+)
 
 app = typer.Typer(help="Build a customer-support knowledge base from a website.")
 
@@ -76,6 +83,16 @@ def profile(
 ) -> None:
     """Ask the LLM for the site profile: business, entities, support checklist."""
     _run_stage(ProfileService(ProfileConfig(snippet_words=snippet_words)), _context(site, data))
+
+
+@app.command()
+def classify(
+    site: str = typer.Argument(..., help="Site name or URL, e.g. art-mat.com.pl"),
+    data: Path = DATA_OPTION,
+    batch_size: int = typer.Option(8, help="Sections per LLM call."),
+) -> None:
+    """Label every section with a topic and entities from the site profile."""
+    _run_stage(ClassifyService(ClassifyConfig(batch_size=batch_size)), _context(site, data))
 
 
 def _context(site_or_url: str, data: Path) -> SiteContext:

@@ -2,8 +2,22 @@ import logging
 import time
 
 from kb_builder.context import SiteContext
-from kb_builder.models import CrawlConfig, ExtractConfig, ProfileConfig, SegmentConfig, StageResult
-from kb_builder.services import BaseService, CrawlService, ExtractService, ProfileService, SegmentService
+from kb_builder.models import (
+    ClassifyConfig,
+    CrawlConfig,
+    ExtractConfig,
+    ProfileConfig,
+    SegmentConfig,
+    StageResult,
+)
+from kb_builder.services import (
+    BaseService,
+    ClassifyService,
+    CrawlService,
+    ExtractService,
+    ProfileService,
+    SegmentService,
+)
 
 logger = logging.getLogger("kb_builder.pipeline")
 
@@ -66,7 +80,14 @@ def build_pipeline(
     extract: ExtractConfig | None = None,
     segment: SegmentConfig | None = None,
     profile: ProfileConfig | None = None,
+    classify: ClassifyConfig | None = None,
 ) -> Pipeline:
     return Pipeline(
-        [CrawlService(crawl), ExtractService(extract), SegmentService(segment), ProfileService(profile)]
+        [
+            CrawlService(crawl),
+            ExtractService(extract),
+            SegmentService(segment),
+            ProfileService(profile),
+            ClassifyService(classify),
+        ]
     )

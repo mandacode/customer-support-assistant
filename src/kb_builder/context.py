@@ -35,3 +35,7 @@ class SiteContext(BaseModel):
     @property
     def profile_dir(self) -> Path:
         return self.data_root / "profile" / self.site
+
+    @property
+    def classified_dir(self) -> Path:
+        return self.data_root / "classified" / self.site
