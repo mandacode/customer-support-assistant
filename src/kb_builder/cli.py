@@ -1,8 +1,10 @@
+import logging
 from pathlib import Path
 
 import typer
 
-from kb_builder.crawl import CrawlConfig, crawl_site
+from kb_builder.models import CrawlConfig
+from kb_builder.services import CrawlService
 
 app = typer.Typer(help="Build a customer-support knowledge base from a website.")
 
@@ -10,6 +12,8 @@ app = typer.Typer(help="Build a customer-support knowledge base from a website."
 @app.callback()
 def main() -> None:
     """Knowledge base builder."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @app.command()
@@ -23,13 +27,10 @@ def crawl(
 ) -> None:
     """Discover pages (sitemap + links) and save raw HTML/PDF to the cache."""
     config = CrawlConfig(max_pages=max_pages, max_depth=max_depth, delay=delay, refresh=refresh)
-    result = crawl_site(url, out, config)
+    result = CrawlService(url, out, config).run()
 
-    counts: dict[str, int] = {}
-    for record in result.records:
-        counts[record.kind] = counts.get(record.kind, 0) + 1
     typer.echo(f"\nSite: {result.site}  ->  {result.out_dir}")
-    typer.echo("  " + ", ".join(f"{kind}: {n}" for kind, n in sorted(counts.items())))
+    typer.echo("  " + ", ".join(f"{kind}: {n}" for kind, n in result.counts().items()))
     typer.echo(f"  manifest: {result.out_dir / 'crawl.json'}")
 
 
