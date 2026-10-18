@@ -3,13 +3,13 @@ import re
 import time
 from collections import deque
 from datetime import datetime, timezone
-from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
 import httpx
 from selectolax.lexbor import LexborHTMLParser
 
+from kb_builder.context import SiteContext
 from kb_builder.models import CrawlConfig, CrawlManifest, CrawlResult, DiscoveredVia, PageKind, PageRecord
 from kb_builder.services.base_service import BaseService
 from kb_builder.urls import (
@@ -30,16 +30,16 @@ MANIFEST = "crawl.json"
 class CrawlService(BaseService[CrawlResult]):
     """Discover a site's pages (sitemap + internal links) and cache raw HTML/PDF."""
 
-    def __init__(self, start_url: str, out_root: Path, config: CrawlConfig | None = None) -> None:
+    name = "crawl"
+
+    def __init__(self, config: CrawlConfig | None = None) -> None:
         super().__init__()
-        start = normalize(start_url)
-        if not start:
-            raise ValueError(f"Not an http(s) URL: {start_url}")
-        self.start_url = start
-        self.out_root = out_root
         self.config = config or CrawlConfig()
 
-    def run(self) -> CrawlResult:
+    def run(self, context: SiteContext) -> CrawlResult:
+        if not context.start_url:
+            raise ValueError("The crawl stage needs a start URL.")
+        self.start_url = context.start_url
         with httpx.Client(
             headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
@@ -49,9 +49,8 @@ class CrawlService(BaseService[CrawlResult]):
             # Resolve redirects first (e.g. bare domain -> www) so robots.txt and
             # the sitemap are read from the host that actually serves the site.
             origin = _origin(str(client.get(self.start_url).url))
-            site = site_key(urlsplit(origin).netloc)
-            self._site = site
-            self._out_dir = self.out_root / site
+            self._site = site_key(urlsplit(origin).netloc)
+            self._out_dir = context.raw_dir
             (self._out_dir / "pages").mkdir(parents=True, exist_ok=True)
 
             self._robots = self._load_robots(origin)
@@ -59,7 +58,7 @@ class CrawlService(BaseService[CrawlResult]):
             records = self._crawl(origin)
 
         self._save_manifest(records)
-        return CrawlResult(site=site, out_dir=self._out_dir, records=records)
+        return CrawlResult(site=context.site, out_dir=self._out_dir, records=records)
 
     def _crawl(self, origin: str) -> list[PageRecord]:
         queue: deque[PageRecord] = deque([PageRecord(url=self.start_url, depth=0, discovered_via=DiscoveredVia.START)])

@@ -11,6 +11,7 @@ from markdownify import markdownify
 from pypdf import PdfReader
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
+from kb_builder.context import SiteContext
 from kb_builder.models import (
     Contacts,
     CrawlManifest,
@@ -61,14 +62,17 @@ DEDUPE_MIN_WORDS = 8
 class ExtractService(BaseService[ExtractResult]):
     """Turn cached raw pages into clean Markdown plus per-page metadata."""
 
-    def __init__(self, raw_dir: Path, out_root: Path, config: ExtractConfig | None = None) -> None:
+    name = "extract"
+
+    def __init__(self, config: ExtractConfig | None = None) -> None:
         super().__init__()
-        self.raw_dir = raw_dir
-        self.site = raw_dir.name
-        self.out_dir = out_root / self.site
         self.config = config or ExtractConfig()
 
-    def run(self) -> ExtractResult:
+    def inputs(self, context: SiteContext) -> list[Path]:
+        return [context.raw_dir / "crawl.json"]
+
+    def run(self, context: SiteContext) -> ExtractResult:
+        self.raw_dir, self.out_dir, self.site = context.raw_dir, context.extracted_dir, context.site
         crawl = CrawlManifest.model_validate_json((self.raw_dir / "crawl.json").read_text())
         records = [r for r in crawl.records if r.kind in (PageKind.HTML, PageKind.PDF) and r.file]
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from kb_builder.context import SiteContext
 from kb_builder.models import (
     ExtractManifest,
     Section,
@@ -37,14 +38,17 @@ class _Draft:
 class SegmentService(BaseService[SegmentResult]):
     """Split extracted pages into heading-based sections."""
 
-    def __init__(self, extracted_dir: Path, out_root: Path, config: SegmentConfig | None = None) -> None:
+    name = "segment"
+
+    def __init__(self, config: SegmentConfig | None = None) -> None:
         super().__init__()
-        self.extracted_dir = extracted_dir
-        self.site = extracted_dir.name
-        self.out_dir = out_root / self.site
         self.config = config or SegmentConfig()
 
-    def run(self) -> SegmentResult:
+    def inputs(self, context: SiteContext) -> list[Path]:
+        return [context.extracted_dir / "extract.json"]
+
+    def run(self, context: SiteContext) -> SegmentResult:
+        self.extracted_dir, self.out_dir, self.site = context.extracted_dir, context.segmented_dir, context.site
         extract = ExtractManifest.model_validate_json((self.extracted_dir / "extract.json").read_text())
 
         sections: list[Section] = []

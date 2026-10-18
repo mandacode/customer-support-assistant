@@ -20,6 +20,14 @@ class DiscoveredVia(StrEnum):
     LINK = "link"
 
 
+class StageResult(BaseModel):
+    site: str
+    out_dir: Path
+
+    def counts(self) -> dict[str, int]:
+        return {}
+
+
 class CrawlConfig(BaseModel):
     max_pages: int = Field(200, ge=1)
     max_depth: int = Field(5, ge=0)
@@ -50,9 +58,7 @@ class CrawlManifest(BaseModel):
     records: list[PageRecord]
 
 
-class CrawlResult(BaseModel):
-    site: str
-    out_dir: Path
+class CrawlResult(StageResult):
     records: list[PageRecord]
 
     def counts(self) -> dict[str, int]:
@@ -110,9 +116,7 @@ class ExtractManifest(BaseModel):
     pages: list[ExtractedPage]
 
 
-class ExtractResult(BaseModel):
-    site: str
-    out_dir: Path
+class ExtractResult(StageResult):
     pages: list[ExtractedPage]
 
     def counts(self) -> dict[str, int]:
@@ -161,9 +165,7 @@ class SegmentManifest(BaseModel):
     skipped_pages: list[str]
 
 
-class SegmentResult(BaseModel):
-    site: str
-    out_dir: Path
+class SegmentResult(StageResult):
     sections: list[Section]
     skipped_pages: list[str]
 
