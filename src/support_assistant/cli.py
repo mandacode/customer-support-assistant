@@ -41,7 +41,7 @@ def ask(
 def chat(show_context: bool = typer.Option(False, "--context", "-c", help="Print the retrieved chunks.")) -> None:
     """Interactive chat; an empty line or Ctrl+D ends it."""
     assistant = SupportAssistant()
-    typer.echo(f"Asystent {assistant.settings.site}. Pusta linia kończy rozmowę.")
+    typer.echo(f"Assistant for {assistant.settings.site}. An empty line ends the chat.")
     try:
         while True:
             try:
@@ -58,9 +58,9 @@ def chat(show_context: bool = typer.Option(False, "--context", "-c", help="Print
 def _print(result: AssistantAnswer, show_context: bool) -> None:
     typer.echo(result.answer)
     if result.source_ids:
-        typer.secho(f"źródła: {', '.join(result.source_ids)}", fg=typer.colors.BRIGHT_BLACK)
+        typer.secho(f"sources: {', '.join(result.source_ids)}", fg=typer.colors.BRIGHT_BLACK)
     if result.rejected_answer:
-        typer.secho(f"(odrzucona odpowiedź: {'; '.join(result.problems)})", fg=typer.colors.YELLOW)
+        typer.secho(f"(rejected answer: {'; '.join(result.problems)})", fg=typer.colors.YELLOW)
     if show_context:
         for item in result.contexts:
             typer.secho(f"\n[{item.score:.3f}] {item.chunk.id}", fg=typer.colors.CYAN)
