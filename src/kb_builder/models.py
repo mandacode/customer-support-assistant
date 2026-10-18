@@ -312,7 +312,10 @@ class MergeResult(StageResult):
 
 
 class NormalizeConfig(BaseModel):
-    reasoning_effort: str = "low"
+    # Restructuring tables (e.g. which price list is for which vehicle) is beyond
+    # gpt-5-nano; the default model stays for every other stage.
+    model: str | None = "gpt-5-mini-2025-08-07"
+    reasoning_effort: str = "medium"
     # Share of the output's meaningful words that must occur in the source text.
     min_word_coverage: float = Field(0.9, gt=0, le=1)
 

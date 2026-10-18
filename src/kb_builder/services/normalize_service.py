@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from kb_builder.context import SiteContext
@@ -29,7 +30,8 @@ Hard rules:
 - Keep every fact: names, numbers, prices, dimensions, units, contact details and conditions,
   copied exactly with the same digits and spelling.
 - Remove website leftovers: buttons, navigation, calls to action ("Wyznacz trasę", "Zobacz ofertę"),
-  calculator widgets, empty placeholders and repeated text.
+  instructions for page widgets, empty placeholders, headings with no content under them,
+  and sentences that repeat earlier ones.
 - Write in the site's language with the source's own wording. You may shorten or reorder,
   but do not paraphrase with new words.
 - If the source contains contradicting values, keep both; do not resolve them.
@@ -37,6 +39,9 @@ Hard rules:
 Structure:
 - `##` headings for the parts of the document, bullet lists for features or options.
 - Markdown tables for price lists and specifications: one row per item, columns from the source.
+- Put the heading that says what a table or list applies to (e.g. a vehicle type) directly
+  above it. The source may list such headings before several tables: keep their order, so
+  the first heading goes with the first table, the second with the second.
 """
 
 
@@ -102,13 +107,14 @@ class NormalizeService(BaseService[NormalizeResult]):
             user=self._prompt(document, profile, source),
             schema=NormalizedDocument,
             reasoning_effort=self.config.reasoning_effort,
+            model=self.config.model,
         )
         problems = self._verify(f"{output.title}\n{output.body_markdown}", source)
 
         if problems:
             title, body = document.title, source
         else:
-            title, body = output.title.strip(), output.body_markdown.strip()
+            title, body = output.title.strip(), _fix_tables(output.body_markdown.strip())
 
         file = f"{document.id}.md"
         path = context.kb_dir / file
@@ -159,6 +165,21 @@ class NormalizeService(BaseService[NormalizeResult]):
             return
         for item in json.loads(report.read_text()):
             (context.kb_dir / item["file"]).unlink(missing_ok=True)
+
+
+def _fix_tables(markdown: str) -> str:
+    """Insert the `|---|` row a Markdown table needs after its header, if missing."""
+    lines = markdown.splitlines()
+    fixed: list[str] = []
+    for index, line in enumerate(lines):
+        fixed.append(line)
+        is_row = line.strip().startswith("|")
+        starts_table = is_row and (index == 0 or not lines[index - 1].strip().startswith("|"))
+        following = lines[index + 1] if index + 1 < len(lines) else ""
+        if starts_table and not re.match(r"^\s*\|?\s*:?-{3,}", following):
+            columns = line.strip().strip("|").count("|") + 1
+            fixed.append("|" + "---|" * columns)
+    return "\n".join(fixed)
 
 
 def _front_matter(document: DocumentGroup, title: str, normalized: bool) -> str:

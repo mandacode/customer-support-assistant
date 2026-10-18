@@ -33,6 +33,14 @@ NOISE_SELECTORS = [
     "script", "style", "noscript", "template", "svg", "iframe", "img", "picture", "video",
     "form", "select", "button", "input", "textarea",
     ".skip-link", ".screen-reader-text", ".sr-only", ".visually-hidden",
+    "[hidden]",
+    # Responsive copies hidden on desktop. The desktop layout is the canonical
+    # one; mobile variants repeat it, often as interactive widgets that leave
+    # placeholders ("0 PLN") once scripts are gone.
+    ".elementor-hidden-desktop",  # Elementor
+    ".d-lg-none", ".d-xl-none", ".hidden-lg", ".visible-xs", ".visible-sm",  # Bootstrap 3-5
+    ".lg\\:hidden", ".xl\\:hidden",  # Tailwind
+    ".vc_hidden-lg",  # WPBakery
 ]
 
 # Site chrome: removed from pages, but kept once in boilerplate.md because it
