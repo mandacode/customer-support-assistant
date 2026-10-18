@@ -309,3 +309,30 @@ class MergeResult(StageResult):
             "sections": sum(len(d.section_ids) for d in self.documents),
             "dropped": len(self.dropped),
         }
+
+
+class NormalizeConfig(BaseModel):
+    reasoning_effort: str = "low"
+    # Share of the output's meaningful words that must occur in the source text.
+    min_word_coverage: float = Field(0.9, gt=0, le=1)
+
+
+class NormalizedDocument(BaseModel):
+    title: str = Field(description="Short title in the site's language, using words from the source.")
+    body_markdown: str = Field(description="The document body in Markdown, without the title heading.")
+
+
+class DocumentReport(BaseModel):
+    id: str
+    file: str
+    normalized: bool
+    problems: list[str] = Field(default_factory=list)
+    dropped_numbers: list[str] = Field(default_factory=list)
+
+
+class NormalizeResult(StageResult):
+    reports: list[DocumentReport]
+
+    def counts(self) -> dict[str, int]:
+        normalized = sum(r.normalized for r in self.reports)
+        return {"files": len(self.reports), "normalized": normalized, "fallback": len(self.reports) - normalized}

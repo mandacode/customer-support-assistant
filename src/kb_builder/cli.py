@@ -4,7 +4,15 @@ from pathlib import Path
 import typer
 
 from kb_builder.context import SiteContext
-from kb_builder.models import ClassifyConfig, CrawlConfig, ExtractConfig, MergeConfig, ProfileConfig, SegmentConfig
+from kb_builder.models import (
+    ClassifyConfig,
+    CrawlConfig,
+    ExtractConfig,
+    MergeConfig,
+    NormalizeConfig,
+    ProfileConfig,
+    SegmentConfig,
+)
 from kb_builder.pipeline import Pipeline, PipelineError, build_pipeline
 from kb_builder.services import (
     BaseService,
@@ -12,6 +20,7 @@ from kb_builder.services import (
     CrawlService,
     ExtractService,
     MergeService,
+    NormalizeService,
     ProfileService,
     SegmentService,
 )
@@ -103,6 +112,16 @@ def merge(
 ) -> None:
     """Group classified sections into future knowledge-base files (no LLM)."""
     _run_stage(MergeService(MergeConfig()), _context(site, data))
+
+
+@app.command()
+def normalize(
+    site: str = typer.Argument(..., help="Site name or URL, e.g. art-mat.com.pl"),
+    data: Path = DATA_OPTION,
+    min_word_coverage: float = typer.Option(0.9, help="Share of output words that must occur in the source."),
+) -> None:
+    """Write knowledge-base Markdown files, verifying every LLM rewrite against the source."""
+    _run_stage(NormalizeService(NormalizeConfig(min_word_coverage=min_word_coverage)), _context(site, data))
 
 
 def _context(site_or_url: str, data: Path) -> SiteContext:

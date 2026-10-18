@@ -12,6 +12,8 @@ class SiteContext(BaseModel):
     site: str
     start_url: str | None = None
     data_root: Path = Path("data")
+    # The finished knowledge base lives outside the intermediate data folder.
+    kb_root: Path = Path("knowledge_base")
 
     @classmethod
     def from_url(cls, url: str, data_root: Path = Path("data")) -> "SiteContext":
@@ -43,3 +45,11 @@ class SiteContext(BaseModel):
     @property
     def merged_dir(self) -> Path:
         return self.data_root / "merged" / self.site
+
+    @property
+    def normalized_dir(self) -> Path:
+        return self.data_root / "normalized" / self.site
+
+    @property
+    def kb_dir(self) -> Path:
+        return self.kb_root / self.site

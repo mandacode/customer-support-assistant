@@ -27,9 +27,21 @@ def is_grounded(phrase: str, source: str, min_ratio: float = 1.0) -> bool:
     phrase_stems = stems(phrase)
     if not phrase_stems:
         return False
+    return 1 - len(ungrounded_words(phrase, source)) / len(phrase_stems) >= min_ratio
+
+
+def ungrounded_words(text: str, source: str) -> list[str]:
+    """Meaningful words of `text` that have no matching word in `source`."""
     source_words = set(re.findall(r"\w+", fold(source)))
-    found = sum(1 for word in phrase_stems if any(_same_word(word, other) for other in source_words))
-    return found / len(phrase_stems) >= min_ratio
+    return [word for word in stems(text) if not any(_same_word(word, other) for other in source_words)]
+
+
+def numbers(text: str) -> list[str]:
+    return re.findall(r"\d+", text)
+
+
+def emails(text: str) -> set[str]:
+    return {e.lower() for e in re.findall(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", text)}
 
 
 def _same_word(a: str, b: str) -> bool:
