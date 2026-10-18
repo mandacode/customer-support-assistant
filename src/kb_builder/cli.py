@@ -4,13 +4,14 @@ from pathlib import Path
 import typer
 
 from kb_builder.context import SiteContext
-from kb_builder.models import ClassifyConfig, CrawlConfig, ExtractConfig, ProfileConfig, SegmentConfig
+from kb_builder.models import ClassifyConfig, CrawlConfig, ExtractConfig, MergeConfig, ProfileConfig, SegmentConfig
 from kb_builder.pipeline import Pipeline, PipelineError, build_pipeline
 from kb_builder.services import (
     BaseService,
     ClassifyService,
     CrawlService,
     ExtractService,
+    MergeService,
     ProfileService,
     SegmentService,
 )
@@ -93,6 +94,15 @@ def classify(
 ) -> None:
     """Label every section with a topic and entities from the site profile."""
     _run_stage(ClassifyService(ClassifyConfig(batch_size=batch_size)), _context(site, data))
+
+
+@app.command()
+def merge(
+    site: str = typer.Argument(..., help="Site name or URL, e.g. art-mat.com.pl"),
+    data: Path = DATA_OPTION,
+) -> None:
+    """Group classified sections into future knowledge-base files (no LLM)."""
+    _run_stage(MergeService(MergeConfig()), _context(site, data))
 
 
 def _context(site_or_url: str, data: Path) -> SiteContext:

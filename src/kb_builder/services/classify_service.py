@@ -135,6 +135,10 @@ class ClassifyService(BaseService[ClassifyResult]):
         return "\n".join(lines)
 
 
+def read_classified(path: Path) -> list[ClassifiedSection]:
+    return [ClassifiedSection.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()]
+
+
 def _labels_schema(section_ids: list[str], entity_ids: list[str]) -> type[BaseModel]:
     """Output schema whose ids are enums, so the model can only pick existing ones."""
     section_id = Literal[tuple(section_ids)]  # type: ignore[valid-type]

@@ -275,3 +275,37 @@ class ClassifyResult(StageResult):
             counts[key] = counts.get(key, 0) + 1
         counts["rejected"] = len(self.rejected)
         return counts
+
+
+class MergeConfig(BaseModel):
+    # An offering section naming this many entities is an overview, not about one of them.
+    overview_min_entities: int = Field(3, ge=2)
+    # A section whose words are this much contained in another one is a duplicate.
+    duplicate_containment: float = Field(0.8, gt=0, le=1)
+
+
+class DroppedSection(BaseModel):
+    section_id: str
+    reason: str
+    duplicate_of: str | None = None
+
+
+class DocumentGroup(BaseModel):
+    id: str = Field(description="Future file path without extension, e.g. 'offerings/naprawa-opon'.")
+    topic: Topic
+    entity_id: str | None = None
+    title: str
+    section_ids: list[str]
+    source_urls: list[str]
+
+
+class MergeResult(StageResult):
+    documents: list[DocumentGroup]
+    dropped: list[DroppedSection]
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "documents": len(self.documents),
+            "sections": sum(len(d.section_ids) for d in self.documents),
+            "dropped": len(self.dropped),
+        }

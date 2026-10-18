@@ -6,6 +6,7 @@ from kb_builder.models import (
     ClassifyConfig,
     CrawlConfig,
     ExtractConfig,
+    MergeConfig,
     ProfileConfig,
     SegmentConfig,
     StageResult,
@@ -15,6 +16,7 @@ from kb_builder.services import (
     ClassifyService,
     CrawlService,
     ExtractService,
+    MergeService,
     ProfileService,
     SegmentService,
 )
@@ -81,6 +83,7 @@ def build_pipeline(
     segment: SegmentConfig | None = None,
     profile: ProfileConfig | None = None,
     classify: ClassifyConfig | None = None,
+    merge: MergeConfig | None = None,
 ) -> Pipeline:
     return Pipeline(
         [
@@ -89,5 +92,6 @@ def build_pipeline(
             SegmentService(segment),
             ProfileService(profile),
             ClassifyService(classify),
+            MergeService(merge),
         ]
     )

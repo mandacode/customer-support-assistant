@@ -39,3 +39,7 @@ class SiteContext(BaseModel):
     @property
     def classified_dir(self) -> Path:
         return self.data_root / "classified" / self.site
+
+    @property
+    def merged_dir(self) -> Path:
+        return self.data_root / "merged" / self.site
