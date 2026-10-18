@@ -3,6 +3,7 @@ from pathlib import Path
 
 import typer
 
+from kb_builder import tracing
 from kb_builder.candidates import extract_candidates
 from kb_builder.context import SiteContext
 from kb_builder.models import (
@@ -161,6 +162,8 @@ def _run(pipeline: Pipeline, context: SiteContext, start: str | None = None, sto
     except PipelineError as exc:
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
+    finally:
+        tracing.flush()
 
 
 if __name__ == "__main__":

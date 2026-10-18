@@ -1,6 +1,7 @@
 import logging
 import time
 
+from kb_builder import tracing
 from kb_builder.context import SiteContext
 from kb_builder.models import (
     ClassifyConfig,
@@ -43,6 +44,7 @@ class Pipeline:
     def names(self) -> list[str]:
         return [stage.name for stage in self.stages]
 
+    @tracing.traced("kb_build")
     def run(
         self,
         context: SiteContext,
@@ -51,7 +53,9 @@ class Pipeline:
     ) -> dict[str, StageResult]:
         """Run stages from `start` to `stop` (both inclusive, default: all)."""
         results: dict[str, StageResult] = {}
-        for stage in self._select(start, stop):
+        stages = self._select(start, stop)
+        tracing.update(input={"site": context.site, "stages": [s.name for s in stages]})
+        for stage in stages:
             missing = [path for path in stage.inputs(context) if not path.exists()]
             if missing:
                 raise PipelineError(
@@ -60,12 +64,13 @@ class Pipeline:
 
             logger.info("\n=== %s: %s", stage.name, context.site)
             started = time.perf_counter()
-            result = stage.run(context)
+            result = tracing.traced(stage.name)(stage.run)(context)
             elapsed = time.perf_counter() - started
 
             counts = ", ".join(f"{key}: {n}" for key, n in result.counts().items())
             logger.info("=== %s done in %.1fs -> %s  (%s)", stage.name, elapsed, result.out_dir, counts)
             results[stage.name] = result
+        tracing.update(output={name: r.counts() for name, r in results.items()})
         return results
 
     def _select(self, start: str | None, stop: str | None) -> list[BaseService]:

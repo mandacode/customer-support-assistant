@@ -1,3 +1,4 @@
+import contextvars
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -136,8 +137,13 @@ class ProfileService(BaseService[ProfileResult]):
                 cache_salt=f"vote-{index}",
             )
 
+        # Each thread runs in a copy of this context, so votes nest under the current trace.
         with ThreadPoolExecutor(max_workers=self.config.votes) as pool:
-            selections = list(pool.map(vote, range(1, self.config.votes + 1)))
+            futures = [
+                pool.submit(contextvars.copy_context().run, vote, index)
+                for index in range(1, self.config.votes + 1)
+            ]
+            selections = [future.result() for future in futures]
 
         entities, summary = aggregate(selections, candidates, min(self.config.min_votes, self.config.votes))
         (out_dir / VOTES).write_text(

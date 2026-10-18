@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
 
+from kb_builder import tracing
+
 logger = logging.getLogger("kb_builder.llm")
 
 # Pinned snapshots keep pipeline output (and RAGAS scores) reproducible.
@@ -49,9 +51,16 @@ class LLMClient:
         # Created lazily so fully cached runs work without an API key.
         if self._client is None:
             load_dotenv()
-            self._client = OpenAI()
+            if tracing.ENABLED:
+                # Drop-in client that records every OpenAI call (tokens, cost) in Langfuse.
+                from langfuse.openai import OpenAI as TracedOpenAI
+
+                self._client = TracedOpenAI()
+            else:
+                self._client = OpenAI()
         return self._client
 
+    @tracing.traced("llm.parse")
     def parse[T: BaseModel](
         self,
         *,
@@ -80,8 +89,14 @@ class LLMClient:
             }
         )
         cached = self._read("chat", key)
+        tracing.update(
+            input={"system": system, "user": user},
+            metadata={"model": model, "effort": effort, "schema": schema.__name__, "cache_hit": cached is not None},
+        )
         if cached is not None:
             logger.info("[llm] cache hit  %s  %s", model, schema.__name__)
+            # Cached calls cost nothing; the original usage is kept for cost reports.
+            tracing.update(output=cached["output"], metadata={"cached_usage": cached.get("usage")})
             return schema.model_validate(cached["output"])
 
         response = self.client.responses.parse(
@@ -100,8 +115,10 @@ class LLMClient:
             model, schema.__name__, usage.get("input_tokens"), usage.get("output_tokens"),
         )
         self._write("chat", key, {"model": model, "usage": usage, "output": output.model_dump(mode="json")})
+        tracing.update(output=output.model_dump(mode="json"))
         return output
 
+    @tracing.traced("llm.embed")
     def embed(self, texts: list[str]) -> list[list[float]]:
         model = self.settings.embedding_model
         keys = [_hash({"model": model, "text": text}) for text in texts]
@@ -123,6 +140,7 @@ class LLMClient:
                 vectors[index] = fresh[texts[index]]
                 self._write("embeddings", keys[index], {"model": model, "vector": vectors[index]})
             logger.info("[llm] %s  embedded %d texts (%d cached)", model, len(unique), len(texts) - len(missing))
+        tracing.update(metadata={"model": model, "texts": len(texts), "cached": len(texts) - len(missing)})
         return [vectors[i] for i in range(len(texts))]
 
     def _path(self, kind: str, key: str) -> Path:

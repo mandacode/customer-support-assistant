@@ -5,7 +5,9 @@ description = "Customer support RAG assistant evaluated with RAGAS"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.27",
+    "langfuse>=3.0",
     "markdownify>=0.13",
+    "numpy>=1.26",
     "openai>=1.99",
     "pydantic>=2.7",
     "pypdf>=5.0",
