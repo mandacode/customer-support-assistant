@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from collections import Counter
@@ -49,13 +50,40 @@ def run(
     finally:
         tracing.flush()
 
-    summary = result.summary
     typer.echo(f"\n{result.out_dir}")
-    typer.echo("overall: " + ", ".join(f"{k}={v}" for k, v in summary["overall"].items()))
-    for category, values in summary["by_category"].items():
-        typer.echo(f"  {category:<13} " + ", ".join(f"{k}={v}" for k, v in values.items()))
-    if summary["errors"]:
-        typer.secho(f"{summary['errors']} metric errors, see samples.jsonl", fg=typer.colors.YELLOW)
+    _print_summary(result.summary)
+
+
+@app.command()
+def retrieval(
+    site: str = typer.Argument(..., help="Site name, e.g. art-mat.com.pl"),
+    run_name: str = typer.Argument(..., help="Results folder, e.g. 20261019-1334-baseline"),
+) -> None:
+    """(Re)compute nDCG, MRR, Recall and Hit for an existing run, without any LLM call."""
+    from evaluation.evaluation_service import EvaluationService
+    from evaluation.models import SampleResult
+    from evaluation.retrieval_metrics import add_retrieval_scores
+    from support_assistant.assistant import AssistantSettings, SupportAssistant
+
+    run_dir = EVALS_DIR / site / "results" / run_name
+    golden = {s.id: s for s in load_golden_dataset(EVALS_DIR / site / GOLDEN_DATASET)}
+    results = [SampleResult.model_validate_json(line) for line in (run_dir / "samples.jsonl").read_text().splitlines()]
+    for result in results:
+        result.reference_contexts = golden[result.id].reference_contexts
+
+    chunks = SupportAssistant(AssistantSettings(site=site)).index.chunks
+    missing = {i for r in results for i in r.retrieved_ids} - {c.id for c in chunks}
+    if missing:
+        typer.secho(f"{len(missing)} retrieved chunks are not in the current index; the KB changed since this run.",
+                    fg=typer.colors.RED)
+        raise typer.Exit(1)
+    add_retrieval_scores(results, chunks)
+
+    (run_dir / "samples.jsonl").write_text("".join(r.model_dump_json() + "\n" for r in results))
+    summary_path = run_dir / "summary.json"
+    summary = json.loads(summary_path.read_text()) | EvaluationService.summarize(results)
+    summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    _print_summary(summary)
 
 
 @app.command()
@@ -71,6 +99,14 @@ def validate(site: str = typer.Argument(..., help="Site name, e.g. art-mat.com.p
     if problems:
         raise typer.Exit(1)
     typer.secho("  all quotes found in the site text", fg=typer.colors.GREEN)
+
+
+def _print_summary(summary: dict) -> None:
+    typer.echo("overall: " + ", ".join(f"{k}={v}" for k, v in summary["overall"].items()))
+    for category, values in summary["by_category"].items():
+        typer.echo(f"  {category:<13} " + ", ".join(f"{k}={v}" for k, v in values.items()))
+    if summary["errors"]:
+        typer.secho(f"{summary['errors']} metric errors, see samples.jsonl", fg=typer.colors.YELLOW)
 
 
 if __name__ == "__main__":

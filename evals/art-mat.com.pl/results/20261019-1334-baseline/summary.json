@@ -17,7 +17,11 @@
     "context_precision": 0.775,
     "context_recall": 0.892,
     "factual_correctness": 0.626,
-    "faithfulness": 0.845
+    "faithfulness": 0.845,
+    "hit_at_k": 0.944,
+    "mrr": 0.833,
+    "ndcg_at_k": 0.811,
+    "recall_at_k": 0.9
   },
   "by_category": {
     "aggregate": {
@@ -27,7 +31,11 @@
       "context_precision": 0.667,
       "context_recall": 0.762,
       "factual_correctness": 0.69,
-      "faithfulness": 1.0
+      "faithfulness": 1.0,
+      "hit_at_k": 1.0,
+      "mrr": 0.667,
+      "ndcg_at_k": 0.682,
+      "recall_at_k": 0.8
     },
     "contact": {
       "samples": 3,
@@ -36,7 +44,11 @@
       "context_precision": 0.667,
       "context_recall": 1.0,
       "factual_correctness": 1.0,
-      "faithfulness": 1.0
+      "faithfulness": 1.0,
+      "hit_at_k": 1.0,
+      "mrr": 0.667,
+      "ndcg_at_k": 0.591,
+      "recall_at_k": 1.0
     },
     "fact": {
       "samples": 10,
@@ -45,7 +57,11 @@
       "context_precision": 0.85,
       "context_recall": 0.9,
       "factual_correctness": 0.541,
-      "faithfulness": 0.98
+      "faithfulness": 0.98,
+      "hit_at_k": 0.9,
+      "mrr": 0.9,
+      "ndcg_at_k": 0.88,
+      "recall_at_k": 0.9
     },
     "injection": {
       "samples": 3,
@@ -64,7 +80,11 @@
       "context_precision": 0.736,
       "context_recall": 0.833,
       "factual_correctness": 0.533,
-      "faithfulness": 0.924
+      "faithfulness": 0.924,
+      "hit_at_k": 0.833,
+      "mrr": 0.75,
+      "ndcg_at_k": 0.772,
+      "recall_at_k": 0.75
     },
     "price": {
       "samples": 11,
@@ -73,7 +93,11 @@
       "context_precision": 0.864,
       "context_recall": 1.0,
       "factual_correctness": 0.767,
-      "faithfulness": 0.886
+      "faithfulness": 0.886,
+      "hit_at_k": 1.0,
+      "mrr": 0.909,
+      "ndcg_at_k": 0.89,
+      "recall_at_k": 1.0
     },
     "trap": {
       "samples": 3,
@@ -82,7 +106,11 @@
       "context_precision": 0.5,
       "context_recall": 0.611,
       "factual_correctness": 0.133,
-      "faithfulness": 1.0
+      "faithfulness": 1.0,
+      "hit_at_k": 1.0,
+      "mrr": 0.833,
+      "ndcg_at_k": 0.721,
+      "recall_at_k": 0.833
     },
     "unanswerable": {
       "samples": 9,

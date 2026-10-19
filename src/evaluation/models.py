@@ -27,6 +27,7 @@ class SampleResult(BaseModel):
     expected_behavior: str
     user_input: str
     reference: str
+    reference_contexts: list[str] = Field(default_factory=list)
     response: str
     answered: bool
     rejected_answer: str | None

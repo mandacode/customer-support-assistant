@@ -10,6 +10,7 @@ from pathlib import Path
 from evaluation.golden_dataset import GOLDEN_DATASET, GoldenDatasetSample, load_golden_dataset
 from evaluation.metrics import EvaluationMetrics
 from evaluation.models import EvaluationConfig, EvaluationResult, SampleResult
+from evaluation.retrieval_metrics import add_retrieval_scores
 from kb_builder import tracing
 from kb_builder.context import SiteContext
 from kb_builder.services.base_service import BaseService
@@ -42,9 +43,11 @@ class EvaluationService(BaseService[EvaluationResult]):
             "%d samples, assistant on %s, judge %s", len(samples), settings.site, self.config.judge_model
         )
 
-        results = self._answer_all(samples, settings)
+        assistant = SupportAssistant(settings)
+        results = self._answer_all(samples, assistant)
+        add_retrieval_scores(results, assistant.index.chunks)
         asyncio.run(self._score_all(results))
-        summary = self._summarize(results)
+        summary = self.summarize(results)
         out_dir = self._save(context, results, summary, settings)
         self._push_scores(results)
         return EvaluationResult(site=context.site, out_dir=out_dir, samples=results, summary=summary)
@@ -58,9 +61,8 @@ class EvaluationService(BaseService[EvaluationResult]):
             samples = [s for s in samples if s.id in wanted]
         return samples[: self.config.limit] if self.config.limit else samples
 
-    def _answer_all(self, samples: list[GoldenDatasetSample], settings: AssistantSettings) -> list[SampleResult]:
+    def _answer_all(self, samples: list[GoldenDatasetSample], assistant: SupportAssistant) -> list[SampleResult]:
         """Run the assistant on every question, each in its own trace."""
-        assistant = SupportAssistant(settings)
         results = []
         for index, sample in enumerate(samples, start=1):
             self.logger.info("[%d/%d] %s", index, len(samples), sample.id)
@@ -77,6 +79,7 @@ class EvaluationService(BaseService[EvaluationResult]):
             expected_behavior=sample.expected_behavior,
             user_input=sample.user_input,
             reference=sample.reference,
+            reference_contexts=sample.reference_contexts,
             response=reply.answer,
             answered=reply.answered,
             rejected_answer=reply.rejected_answer,
@@ -119,7 +122,8 @@ class EvaluationService(BaseService[EvaluationResult]):
             if done % 20 == 0 or done == len(tasks):
                 self.logger.info("scored %d/%d metric calls", done, len(tasks))
 
-    def _summarize(self, results: list[SampleResult]) -> dict:
+    @staticmethod
+    def summarize(results: list[SampleResult]) -> dict:
         """Mean of every metric, overall and per category (missing scores are skipped)."""
 
         def means(items: list[SampleResult]) -> dict[str, float | int]:
