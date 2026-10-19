@@ -41,6 +41,7 @@ class EvalConfig(BaseModel):
     judge_max_tokens: int = 16000
     concurrency: int = Field(4, ge=1)
     label: str = "run"
+    cache_dir: Path = Path("data/ragas_cache")
 
 
 class SampleResult(BaseModel):
@@ -111,8 +112,17 @@ async def score_all(results: list[SampleResult], config: EvalConfig) -> None:
         FactualCorrectness,
     )
 
+    from ragas.cache import DiskCacheBackend
+
     client = AsyncOpenAI(timeout=180, max_retries=2)
-    llm = llm_factory(config.judge_model, client=client, max_tokens=config.judge_max_tokens)
+    # Judge calls are cached on disk: re-grading an unchanged answer costs nothing,
+    # only answers that changed since the last run are sent to the judge again.
+    llm = llm_factory(
+        config.judge_model,
+        client=client,
+        max_tokens=config.judge_max_tokens,
+        cache=DiskCacheBackend(cache_dir=str(config.cache_dir)),
+    )
     embeddings = embedding_factory("openai", model="text-embedding-3-small", client=client)
 
     behavior = DiscreteMetric(name="behavior", allowed_values=["pass", "fail"], prompt=BEHAVIOR_PROMPT)
