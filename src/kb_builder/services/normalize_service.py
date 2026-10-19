@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from kb_builder.context import SiteContext
-from kb_builder.grounding import emails, misplaced_numbers, numbers, stems, ungrounded_words
+from kb_builder.grounding import dropped_sentences, emails, misplaced_numbers, numbers, stems, ungrounded_words
 from kb_builder.llm import LLMClient
 from kb_builder.models import (
     ClassifiedSection,
@@ -29,9 +29,9 @@ class NormalizeService(BaseService[NormalizeResult]):
 
     The LLM only tidies the text of each document group. Its output is accepted
     only if every number and e-mail address occurs in the source, every number
-    keeps its source context (no price moved to another row), and almost all of
-    its words occur in the source; otherwise the file is written from the source
-    text as is.
+    keeps its source context (no price moved to another row), almost all of its
+    words occur in the source, and no substantial source sentence is missing;
+    otherwise the file is written from the source text as is.
     """
 
     name = "normalize"
@@ -126,6 +126,7 @@ class NormalizeService(BaseService[NormalizeResult]):
             model=used_model or (None if accepted is None else self.llm.settings.chat_model),
             problems=problems,
             dropped_numbers=dropped,
+            dropped_sentences=self._dropped_sentences(source, body),
         )
 
     def _model_for(self, document: DocumentGroup, source: str) -> str | None:
@@ -137,7 +138,8 @@ class NormalizeService(BaseService[NormalizeResult]):
         return self.config.model
 
     def _verify(self, output: str, source: str) -> list[str]:
-        """Deterministic checks that the output adds nothing the source does not say."""
+        """Deterministic checks that the output adds nothing the source does not say
+        and drops no substantial sentence of it."""
         problems = []
         source_numbers = set(numbers(source))
         added_numbers = sorted({n for n in numbers(output) if n not in source_numbers})
@@ -158,7 +160,16 @@ class NormalizeService(BaseService[NormalizeResult]):
         if coverage < self.config.min_word_coverage:
             sample = ", ".join(dict.fromkeys(missing))
             problems.append(f"word coverage {coverage:.0%}, new words: {sample[:200]}")
+
+        dropped = self._dropped_sentences(source, output)
+        if dropped:
+            problems.append(f"source sentences missing: {' | '.join(s[:80] for s in dropped[:3])}")
         return problems
+
+    def _dropped_sentences(self, source: str, output: str) -> list[str]:
+        return dropped_sentences(
+            source, output, self.config.min_sentence_words, self.config.min_sentence_coverage
+        )
 
     def _prompt(self, document: DocumentGroup, profile: SiteProfile, source: str) -> str:
         return "\n".join(

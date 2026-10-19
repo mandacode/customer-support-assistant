@@ -342,6 +342,11 @@ class NormalizeConfig(BaseModel):
     reasoning_effort: str = "medium"
     # Share of the output's meaningful words that must occur in the source text.
     min_word_coverage: float = Field(0.9, gt=0, le=1)
+    # Dropped content: a source sentence with at least `min_sentence_words`
+    # meaningful words must keep this share of them close together in the output.
+    # Shorter lines (buttons, navigation) may be removed.
+    min_sentence_words: int = Field(6, ge=1)
+    min_sentence_coverage: float = Field(0.8, gt=0, le=1)
 
 
 class NormalizedDocument(BaseModel):
@@ -357,6 +362,7 @@ class DocumentReport(BaseModel):
     # Problems of every rejected attempt, e.g. a failed cheap model before the retry.
     problems: list[str] = Field(default_factory=list)
     dropped_numbers: list[str] = Field(default_factory=list)
+    dropped_sentences: list[str] = Field(default_factory=list)
 
 
 class NormalizeResult(StageResult):

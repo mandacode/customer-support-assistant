@@ -1,3 +1,4 @@
+import bisect
 import re
 import unicodedata
 
@@ -34,6 +35,52 @@ def ungrounded_words(text: str, source: str) -> list[str]:
     """Meaningful words of `text` that have no matching word in `source`."""
     source_words = set(re.findall(r"\w+", fold(source)))
     return [word for word in stems(text) if not any(_same_word(word, other) for other in source_words)]
+
+
+def dropped_sentences(source: str, output: str, min_words: int = 6, min_coverage: float = 0.8) -> list[str]:
+    """Source sentences whose content is missing from `output`.
+
+    A sentence counts as kept when at least `min_coverage` of its meaningful
+    words occur close together in the output (within a window about twice the
+    sentence's length), so its words scattered over other paragraphs do not
+    hide a dropped sentence. Sentences with fewer than `min_words` meaningful
+    words (buttons, navigation, short headings) are ignored.
+    """
+    output_tokens = _tokens(output)
+    dropped = []
+    for sentence in _sentences(source):
+        words = list(dict.fromkeys(stems(sentence)))
+        if len(words) < min_words:
+            continue
+        if _best_window_coverage(words, output_tokens, span=2 * len(words) + 4) < min_coverage:
+            dropped.append(sentence)
+    return dropped
+
+
+def _sentences(text: str) -> list[str]:
+    parts = []
+    for line in text.splitlines():
+        parts += [part.strip() for part in re.split(r"(?<=[.!?;:])\s+", line) if part.strip()]
+    return parts
+
+
+def _best_window_coverage(words: list[str], tokens: list[str], span: int) -> float:
+    """Largest share of `words` found within any `span` consecutive tokens."""
+    positions = [[i for i, token in enumerate(tokens) if _same_word(word, token)] for word in words]
+    starts = sorted({i for found in positions for i in found})
+    best = 0
+    # The best window can always be shifted to start at a matched word.
+    for start in starts:
+        found = sum(1 for at in positions if _any_in_range(at, start, start + span))
+        best = max(best, found)
+        if best == len(words):
+            break
+    return best / len(words)
+
+
+def _any_in_range(sorted_positions: list[int], low: int, high: int) -> bool:
+    index = bisect.bisect_left(sorted_positions, low)
+    return index < len(sorted_positions) and sorted_positions[index] < high
 
 
 def misplaced_numbers(
