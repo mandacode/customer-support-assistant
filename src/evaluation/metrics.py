@@ -24,10 +24,14 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 class EvaluationMetrics:
     """The RAGAS judge and every metric, and which of them apply to a sample.
 
-    Every sample gets `behavior` (did it answer / refuse as expected) and
-    `faithfulness` (no claims beyond the retrieved context). Only questions that
-    should be answered also get the reference-based metrics: for a correct
-    refusal, answer relevancy and context recall would punish the right outcome.
+    - `behavior` (did it answer / refuse as expected): every sample.
+    - `faithfulness` (no claims beyond the retrieved context): only responses that
+      answer; a refusal ("I don't have this information") has nothing to check,
+      and RAGAS would score it as unsupported. Invented facts inside a refusal
+      fail `behavior`.
+    - reference-based metrics: only questions that should be answered; for a
+      correct refusal, answer relevancy and context recall would punish the
+      right outcome.
     """
 
     def __init__(self, config: EvaluationConfig) -> None:
@@ -50,7 +54,9 @@ class EvaluationMetrics:
         self.answer_relevancy = AnswerRelevancy(llm=self.llm, embeddings=embeddings)
         self.context_precision = ContextPrecisionWithReference(llm=self.llm)
         self.context_recall = ContextRecall(llm=self.llm)
-        self.factual_correctness = FactualCorrectness(llm=self.llm)
+        # Recall: does the response contain the reference's facts. F1 would also punish
+        # correct extra details; invented ones are `faithfulness`'s job.
+        self.factual_correctness = FactualCorrectness(llm=self.llm, mode="recall")
 
     def for_sample(self, result: SampleResult) -> dict[str, Coroutine[Any, Any, Any]]:
         """Metric name -> pending score for every metric that applies to this sample."""
@@ -68,10 +74,11 @@ class EvaluationMetrics:
                 user_input=question,
                 response=response,
             ),
-            "faithfulness": self.faithfulness.ascore(
-                user_input=question, response=response, retrieved_contexts=contexts
-            ),
         }
+        if result.answered:
+            scores["faithfulness"] = self.faithfulness.ascore(
+                user_input=question, response=response, retrieved_contexts=contexts
+            )
         if result.expected_behavior == ExpectedBehavior.ANSWER:
             scores |= {
                 "answer_relevancy": self.answer_relevancy.ascore(user_input=question, response=response),
