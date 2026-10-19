@@ -1,0 +1,121 @@
+{
+  "label": "baseline-v2",
+  "created_at": "20261019-1555",
+  "git_commit": "0ab603a",
+  "judge_model": "gpt-5-mini-2025-08-07",
+  "assistant": {
+    "site": "art-mat.com.pl",
+    "chat_model": "gpt-5-nano-2025-08-07",
+    "top_k": 4,
+    "chunk_words": 300,
+    "reasoning_effort": "low"
+  },
+  "overall": {
+    "samples": 50,
+    "answer_relevancy": 0.666,
+    "behavior": 0.82,
+    "context_precision": 0.796,
+    "context_recall": 0.895,
+    "factual_correctness": 0.59,
+    "faithfulness": 0.923,
+    "hit_at_k": 0.944,
+    "mrr": 0.833,
+    "ndcg_at_k": 0.811,
+    "recall_at_k": 0.914
+  },
+  "by_category": {
+    "aggregate": {
+      "samples": 3,
+      "answer_relevancy": 0.691,
+      "behavior": 0.667,
+      "context_precision": 0.667,
+      "context_recall": 0.762,
+      "factual_correctness": 0.5,
+      "faithfulness": 1.0,
+      "hit_at_k": 1.0,
+      "mrr": 0.667,
+      "ndcg_at_k": 0.682,
+      "recall_at_k": 0.8
+    },
+    "contact": {
+      "samples": 3,
+      "answer_relevancy": 0.575,
+      "behavior": 1.0,
+      "context_precision": 0.667,
+      "context_recall": 1.0,
+      "factual_correctness": 1.0,
+      "faithfulness": 1.0,
+      "hit_at_k": 1.0,
+      "mrr": 0.667,
+      "ndcg_at_k": 0.591,
+      "recall_at_k": 1.0
+    },
+    "fact": {
+      "samples": 10,
+      "answer_relevancy": 0.698,
+      "behavior": 0.9,
+      "context_precision": 0.85,
+      "context_recall": 0.9,
+      "factual_correctness": 0.466,
+      "faithfulness": 0.98,
+      "hit_at_k": 0.9,
+      "mrr": 0.9,
+      "ndcg_at_k": 0.88,
+      "recall_at_k": 0.9
+    },
+    "injection": {
+      "samples": 3,
+      "behavior": 1.0
+    },
+    "off_topic": {
+      "samples": 2,
+      "behavior": 0.5,
+      "faithfulness": 1.0
+    },
+    "policy": {
+      "samples": 6,
+      "answer_relevancy": 0.61,
+      "behavior": 0.833,
+      "context_precision": 0.694,
+      "context_recall": 0.833,
+      "factual_correctness": 0.667,
+      "faithfulness": 0.9,
+      "hit_at_k": 0.833,
+      "mrr": 0.75,
+      "ndcg_at_k": 0.772,
+      "recall_at_k": 0.833
+    },
+    "price": {
+      "samples": 11,
+      "answer_relevancy": 0.756,
+      "behavior": 0.909,
+      "context_precision": 0.864,
+      "context_recall": 1.0,
+      "factual_correctness": 0.652,
+      "faithfulness": 0.85,
+      "hit_at_k": 1.0,
+      "mrr": 0.909,
+      "ndcg_at_k": 0.89,
+      "recall_at_k": 1.0
+    },
+    "trap": {
+      "samples": 3,
+      "answer_relevancy": 0.404,
+      "behavior": 0.0,
+      "context_precision": 0.833,
+      "context_recall": 0.639,
+      "factual_correctness": 0.3,
+      "faithfulness": 1.0,
+      "hit_at_k": 1.0,
+      "mrr": 0.833,
+      "ndcg_at_k": 0.721,
+      "recall_at_k": 0.833
+    },
+    "unanswerable": {
+      "samples": 9,
+      "behavior": 0.889,
+      "faithfulness": 0.5
+    }
+  },
+  "errors": 0
+}

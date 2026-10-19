@@ -167,39 +167,40 @@ one-page WordPress site with a price list and two policy PDFs. The knowledge
 base built from it has 11 files: 6 offerings, pricing, contact, a process
 note and 2 policies. The golden dataset has 50 questions.
 
-Results of the first baseline (`evals/art-mat.com.pl/results/20261019-1334-baseline/`,
+Results of the current baseline (`evals/art-mat.com.pl/results/20261019-1555-baseline-v2/`,
 assistant: `gpt-5-nano`, `top_k=4`; judge: `gpt-5-mini`):
 
 | | n | `behavior` | `faithfulness` | `factual_correctness` | `context_recall` | `recall_at_k` | `ndcg_at_k` |
 |---|---|---|---|---|---|---|---|
-| **overall** | 50 | 0.74 | 0.845 | 0.626 | 0.892 | 0.9 | 0.811 |
-| aggregate | 3 | 0.667 | 1.0 | 0.69 | 0.762 | 0.8 | 0.682 |
+| **overall** | 50 | 0.82 | 0.923 | 0.59 | 0.895 | 0.914 | 0.811 |
+| aggregate | 3 | 0.667 | 1.0 | 0.5 | 0.762 | 0.8 | 0.682 |
 | contact | 3 | 1.0 | 1.0 | 1.0 | 1.0 | 1.0 | 0.591 |
-| fact | 10 | 0.9 | 0.98 | 0.541 | 0.9 | 0.9 | 0.88 |
-| injection | 3 | 1.0 | 0.389 | – | – | – | – |
-| off_topic | 2 | 0.0 | 0.5 | – | – | – | – |
-| policy | 6 | 0.833 | 0.924 | 0.533 | 0.833 | 0.75 | 0.772 |
-| price | 11 | 0.909 | 0.886 | 0.767 | 1.0 | 1.0 | 0.89 |
-| trap | 3 | 0.0 | 1.0 | 0.133 | 0.611 | 0.833 | 0.721 |
-| unanswerable | 9 | 0.556 | 0.663 | – | – | – | – |
+| fact | 10 | 0.9 | 0.98 | 0.466 | 0.9 | 0.9 | 0.88 |
+| injection | 3 | 1.0 | – | – | – | – | – |
+| off_topic | 2 | 0.5 | 1.0 | – | – | – | – |
+| policy | 6 | 0.833 | 0.9 | 0.667 | 0.833 | 0.833 | 0.772 |
+| price | 11 | 0.909 | 0.85 | 0.652 | 1.0 | 1.0 | 0.89 |
+| trap | 3 | 0.0 | 1.0 | 0.3 | 0.639 | 0.833 | 0.721 |
+| unanswerable | 9 | 0.889 | 0.5 | – | – | – | – |
 
 "–": the metric does not apply to that category (see [Metrics](#metrics)).
 
 What the numbers show:
 
-- **Prices, contact and single facts work**: the right chunk is found (`recall_at_k` 1.0) and the
-  answer sticks to it.
+- **Prices, contact and single facts work**: the right chunk is found (`recall_at_k` 1.0 for prices
+  and contact) and the answer sticks to it (`faithfulness` 0.92 overall).
 - **Retrieval misses facts buried in long paragraphs** (the company's NIP, "we also sell rims") and
   finds only 2 of the 5 reference quotes for "What services do you offer?" (`top_k=4` is too small for it).
-- **Traps fail**: the assistant repeats "od 50 PLN" instead of noticing that the cheapest item in
-  the price table costs 100 PLN.
+- **Traps fail** (`behavior` 0.0): the assistant repeats "od 50 PLN" instead of noticing that the
+  cheapest item in the price table costs 100 PLN.
 - **The number guard is too strict**: a correct "60 PLN difference" was replaced by the fallback,
   because 60 itself is not in the context.
-- `faithfulness` and `behavior` were too harsh on correct refusals in this first run; the
-  evaluation has since been fixed (faithfulness only for answers, one contact channel is enough,
-  `factual_correctness` in recall mode).
+- **Refusals mostly work** (`behavior` 0.89 for unanswerable questions), but the assistant still
+  recommends tyres instead of declining when asked for advice the knowledge base does not have.
 
-These are the starting point; every RAG change is measured against them with a new labelled run.
+The first baseline (`20261019-1334-baseline`) used a stricter evaluation that penalised correct
+refusals; it is kept for reference. Every RAG change is measured against the current baseline
+with a new labelled run.
 
 ## Project layout
 
