@@ -34,3 +34,13 @@ def flush() -> None:
     """Send buffered traces; short CLI runs exit before the background sender does."""
     if ENABLED:
         get_client().flush()
+
+
+def current_trace_id() -> str | None:
+    return get_client().get_current_trace_id() if ENABLED else None
+
+
+def score(trace_id: str | None, name: str, value: float, comment: str | None = None) -> None:
+    """Attach an evaluation score (e.g. a RAGAS metric) to a trace."""
+    if ENABLED and trace_id:
+        get_client().create_score(trace_id=trace_id, name=name, value=value, comment=comment)
