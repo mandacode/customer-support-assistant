@@ -9,27 +9,6 @@ from kb_builder.candidates import Candidate
 from kb_builder.grounding import fold
 from kb_builder.models import Entity, EntityKind
 
-SELECTION_PROMPT = """\
-You choose which phrases from a company website name its offerings, for a
-customer-support knowledge base. You get a digest of the site for context and a
-list of CANDIDATES: short phrases copied from the site, each with an id.
-
-Return the offerings as groups of candidate ids:
-- An offering is a product, product line or service a customer can buy, order or ask about.
-- Not offerings: slogans, values or generic claims ("Kompleksowa obsługa", "Najlepszy serwis
-  w mieście"), buttons and calls to action, navigation, page or section titles ("Cennik",
-  "Kontakt"), table column headers, contact labels, policy topics, and variants or
-  parameters that only qualify a price: sizes, materials, wheel or vehicle types listed
-  in a price table are attributes of a service, not offerings of their own.
-- A group holds only different wordings of the SAME offering (e.g. "Wymiana opon" and
-  "Sprzedaż i wymiana opon"). A different activity or product is a different group:
-  repairing, balancing, servicing sensors and selling bolts are four groups, even when
-  one price list or one sentence mentions them together.
-- name_candidate: the candidate of the group that names the offering best.
-- kind: product_line for a named product family, service for work done, product otherwise.
-- You can only use the candidate ids given; there is nothing else to choose from.
-"""
-
 
 def selection_schema(candidate_ids: list[str]) -> type[BaseModel]:
     """Output schema whose ids are enums: the model can only pick listed candidates."""

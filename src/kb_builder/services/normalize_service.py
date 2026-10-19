@@ -15,35 +15,13 @@ from kb_builder.models import (
     SiteProfile,
     Topic,
 )
+from kb_builder.prompts import NORMALIZE_PROMPT
 from kb_builder.services.base_service import BaseService
 from kb_builder.services.classify_service import CLASSIFIED, read_classified
 from kb_builder.services.merge_service import DOCUMENTS
 from kb_builder.services.profile_service import PROFILE
 
 REPORT = "normalize.json"
-
-SYSTEM_PROMPT = """\
-You turn raw text scraped from a company website into one clean knowledge-base document
-for a customer-support assistant.
-
-Hard rules:
-- Use only information in SOURCE. Do not add facts, examples, advice, greetings or marketing.
-- Keep every fact: names, numbers, prices, dimensions, units, contact details and conditions,
-  copied exactly with the same digits and spelling.
-- Remove website leftovers: buttons, navigation, calls to action ("Wyznacz trasę", "Zobacz ofertę"),
-  instructions for page widgets, empty placeholders, headings with no content under them,
-  and sentences that repeat earlier ones.
-- Write in the site's language with the source's own wording. You may shorten or reorder,
-  but do not paraphrase with new words.
-- If the source contains contradicting values, keep both; do not resolve them.
-
-Structure:
-- `##` headings for the parts of the document, bullet lists for features or options.
-- Markdown tables for price lists and specifications: one row per item, columns from the source.
-- Put the heading that says what a table or list applies to (e.g. a vehicle type) directly
-  above it. The source may list such headings before several tables: keep their order, so
-  the first heading goes with the first table, the second with the second.
-"""
 
 
 class NormalizeService(BaseService[NormalizeResult]):
@@ -118,7 +96,7 @@ class NormalizeService(BaseService[NormalizeResult]):
         used_model: str | None = None
         for model in attempts:
             output = self.llm.parse(
-                system=SYSTEM_PROMPT,
+                system=NORMALIZE_PROMPT,
                 user=prompt,
                 schema=NormalizedDocument,
                 reasoning_effort=self.config.reasoning_effort,

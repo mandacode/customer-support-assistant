@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from evaluation.dataset import GOLDEN_DATASET, load_golden_dataset, validate_golden_dataset
+from evaluation.golden_dataset import GOLDEN_DATASET, load_golden_dataset, validate_golden_dataset
 from kb_builder import tracing
 from kb_builder.context import SiteContext
 

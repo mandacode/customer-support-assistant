@@ -6,7 +6,7 @@ from pathlib import Path
 
 from kb_builder.candidates import Candidate, extract_candidates
 from kb_builder.context import SiteContext
-from kb_builder.entity_votes import SELECTION_PROMPT, aggregate, render_candidates, selection_schema
+from kb_builder.entity_votes import aggregate, render_candidates, selection_schema
 from kb_builder.grounding import is_grounded
 from kb_builder.llm import LLMClient
 from kb_builder.models import (
@@ -19,6 +19,7 @@ from kb_builder.models import (
     Section,
     SiteProfile,
 )
+from kb_builder.prompts import ENTITY_SELECTION_PROMPT, PROFILE_PROMPT
 from kb_builder.services.base_service import BaseService
 from kb_builder.services.segment_service import SECTIONS, read_sections
 
@@ -34,25 +35,6 @@ BUSINESS_TYPE_RATIO = 0.5
 # JSON-LD types that describe the business itself.
 BUSINESS_TYPES = {"Organization", "LocalBusiness", "Corporation", "Store", "AutoRepair", "ProfessionalService"}
 JSON_LD_DROP = {"@id", "@context", "image", "logo", "potentialAction", "isPartOf", "primaryImageOfPage"}
-
-SYSTEM_PROMPT = """\
-You analyse a company website to prepare a customer-support knowledge base.
-The input is a digest: every section of the site as `[section_id] heading path :: opening words`,
-plus structured data and contact links found in the HTML.
-
-Rules:
-- Use only facts present in the input. Never invent names, prices, places or services.
-- Write every human-readable field in the site's main language.
-- company_name: the brand name only, without slogans or city taglines from the page title.
-
-support_checklist - 12-15 questions customers of THIS type of business typically ask
-support, based on how such businesses work, NOT on what this site happens to say:
-- Cover practical topics: opening hours, prices, waiting/lead time, booking, payment
-  methods, warranty and complaints, delivery or service area, plus questions specific
-  to the industry (e.g. tyre storage for a tyre service, certificates for a manufacturer).
-- Most questions should be ones the site may NOT answer; they are used to find gaps.
-- key: snake_case English, e.g. opening_hours.
-"""
 
 
 class ProfileService(BaseService[ProfileResult]):
@@ -92,7 +74,7 @@ class ProfileService(BaseService[ProfileResult]):
         self.logger.info("digest: %d sections, %d words", len(sections), _words(digest))
 
         draft = self.llm.parse(
-            system=SYSTEM_PROMPT, user=digest, schema=ProfileDraft, reasoning_effort=self.config.reasoning_effort
+            system=PROFILE_PROMPT, user=digest, schema=ProfileDraft, reasoning_effort=self.config.reasoning_effort
         )
         draft, rejected = self._ground(draft, digest)
 
@@ -130,7 +112,7 @@ class ProfileService(BaseService[ProfileResult]):
 
         def vote(index: int):
             return self.llm.parse(
-                system=SELECTION_PROMPT,
+                system=ENTITY_SELECTION_PROMPT,
                 user=prompt,
                 schema=schema,
                 reasoning_effort=self.config.reasoning_effort,

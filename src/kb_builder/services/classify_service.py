@@ -15,34 +15,13 @@ from kb_builder.models import (
     SiteProfile,
     Topic,
 )
+from kb_builder.prompts import CLASSIFY_PROMPT
 from kb_builder.services.base_service import BaseService
 from kb_builder.services.profile_service import PROFILE
 from kb_builder.services.segment_service import SECTIONS, read_sections
 
 CLASSIFIED = "classified.jsonl"
 NO_ENTITY = "none"
-
-SYSTEM_PROMPT = """\
-You label sections of a company website for a customer-support knowledge base.
-For every section in the input return exactly one label with its section_id.
-
-topic - what the section is mainly about:
-- offering: describes a product or service (what it is, features, parameters, variants, uses)
-- pricing: prices, price lists, cost conditions
-- contact: address, phone, e-mail, opening hours, directions
-- company: about the company, history, mission, values, numbers, team
-- process: how to order or cooperate, quotes, delivery, installation, booking
-- policy: privacy, cookies, terms, warranty or return rules
-- domain_knowledge: standards, regulations or industry explanations not tied to one offering
-- portfolio: case studies or projects done for clients
-- noise: navigation, slogans without facts, calls to action, leftover UI text
-
-entity_ids - the offerings from the entity list that the section is about. Usually set for
-offering and pricing, usually empty for the other topics. Never guess: leave it empty
-when the section does not clearly concern an entity.
-
-reason - a few words on why, for human review.
-"""
 
 
 class ClassifyService(BaseService[ClassifyResult]):
@@ -110,7 +89,7 @@ class ClassifyService(BaseService[ClassifyResult]):
     def _classify(self, batch: list[Section], profile: SiteProfile, entity_ids: list[str]) -> dict[str, BaseModel]:
         schema = _labels_schema([s.id for s in batch], entity_ids)
         result = self.llm.parse(
-            system=SYSTEM_PROMPT,
+            system=CLASSIFY_PROMPT,
             user=self._prompt(batch, profile),
             schema=schema,
             reasoning_effort=self.config.reasoning_effort,
