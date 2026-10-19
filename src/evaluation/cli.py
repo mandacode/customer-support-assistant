@@ -1,5 +1,3 @@
-import asyncio
-import json
 import logging
 import os
 from collections import Counter
@@ -8,6 +6,7 @@ from pathlib import Path
 import typer
 
 from evaluation.golden_dataset import GOLDEN_DATASET, load_golden_dataset, validate_golden_dataset
+from evaluation.models import EvaluationConfig
 from kb_builder import tracing
 from kb_builder.context import SiteContext
 
@@ -35,29 +34,23 @@ def run(
     concurrency: int = typer.Option(4, help="Parallel judge calls."),
 ) -> None:
     """Answer the golden questions with the assistant and grade them with RAGAS."""
-    from evaluation.runner import EvalConfig, answer_all, push_scores, save_run, score_all
-    from support_assistant.assistant import AssistantSettings
+    # Imported here: RAGAS (with LangChain) takes ~5 s to import and `validate` does not need it.
+    from evaluation.evaluation_service import EvaluationService
 
-    samples = load_golden_dataset(EVALS_DIR / site / GOLDEN_DATASET)
-    if ids:
-        wanted = set(ids.split(","))
-        samples = [s for s in samples if s.id in wanted]
-    if limit:
-        samples = samples[:limit]
-
-    settings = AssistantSettings(site=site)
-    config = EvalConfig(label=label, concurrency=concurrency)
-    typer.echo(f"{len(samples)} samples, assistant on {site}, judge {config.judge_model}")
+    config = EvaluationConfig(
+        label=label,
+        evals_root=EVALS_DIR,
+        sample_ids=ids.split(",") if ids else [],
+        limit=limit,
+        concurrency=concurrency,
+    )
     try:
-        results = answer_all(samples, settings)
-        asyncio.run(score_all(results, config))
-        out_dir = save_run(EVALS_DIR / site / "results", results, config, settings)
-        push_scores(results)
+        result = EvaluationService(config).run(SiteContext(site=site))
     finally:
         tracing.flush()
 
-    summary = json.loads((out_dir / "summary.json").read_text())
-    typer.echo(f"\n{out_dir}")
+    summary = result.summary
+    typer.echo(f"\n{result.out_dir}")
     typer.echo("overall: " + ", ".join(f"{k}={v}" for k, v in summary["overall"].items()))
     for category, values in summary["by_category"].items():
         typer.echo(f"  {category:<13} " + ", ".join(f"{k}={v}" for k, v in values.items()))
