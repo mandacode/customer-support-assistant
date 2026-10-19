@@ -7,7 +7,7 @@ from pathlib import Path
 
 import typer
 
-from evaluation.dataset import GOLDEN, load_golden, validate_golden
+from evaluation.dataset import GOLDEN_DATASET, load_golden_dataset, validate_golden_dataset
 from kb_builder import tracing
 from kb_builder.context import SiteContext
 
@@ -38,7 +38,7 @@ def run(
     from evaluation.runner import EvalConfig, answer_all, push_scores, save_run, score_all
     from support_assistant.assistant import AssistantSettings
 
-    samples = load_golden(EVALS_DIR / site / GOLDEN)
+    samples = load_golden_dataset(EVALS_DIR / site / GOLDEN_DATASET)
     if ids:
         wanted = set(ids.split(","))
         samples = [s for s in samples if s.id in wanted]
@@ -68,11 +68,11 @@ def run(
 @app.command()
 def validate(site: str = typer.Argument(..., help="Site name, e.g. art-mat.com.pl")) -> None:
     """Check the golden dataset: unique ids, quotes verbatim in the site text."""
-    path = EVALS_DIR / site / GOLDEN
-    samples = load_golden(path)
+    path = EVALS_DIR / site / GOLDEN_DATASET
+    samples = load_golden_dataset(path)
     counts = Counter(s.category for s in samples)
     typer.echo(f"{path}: {len(samples)} samples  " + ", ".join(f"{k}: {n}" for k, n in sorted(counts.items())))
-    problems = validate_golden(samples, SiteContext(site=site))
+    problems = validate_golden_dataset(samples, SiteContext(site=site))
     for problem in problems:
         typer.secho(f"  {problem}", fg=typer.colors.RED)
     if problems:

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from kb_builder.context import SiteContext
 from kb_builder.models import ExtractManifest
 
-GOLDEN = "golden.jsonl"
+GOLDEN_DATASET = "golden_dataset.jsonl"
 
 
 class Category(StrEnum):
@@ -29,7 +29,7 @@ class ExpectedBehavior(StrEnum):
     REFUSE_WITH_CONTACT = "refuse_with_contact"
 
 
-class GoldenSample(BaseModel):
+class GoldenDatasetSample(BaseModel):
     """One test question. Field names follow RAGAS `SingleTurnSample`."""
 
     id: str
@@ -41,11 +41,11 @@ class GoldenSample(BaseModel):
     expected_behavior: ExpectedBehavior = ExpectedBehavior.ANSWER
 
 
-def load_golden(path: Path) -> list[GoldenSample]:
-    return [GoldenSample.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()]
+def load_golden_dataset(path: Path) -> list[GoldenDatasetSample]:
+    return [GoldenDatasetSample.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def validate_golden(samples: list[GoldenSample], context: SiteContext) -> list[str]:
+def validate_golden_dataset(samples: list[GoldenDatasetSample], context: SiteContext) -> list[str]:
     """Check the dataset against the site itself: ids unique, every quote verbatim in the site text.
 
     The site text is the extracted Markdown of all usable pages (`data/extracted`),

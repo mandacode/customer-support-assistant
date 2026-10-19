@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from evaluation.dataset import ExpectedBehavior, GoldenSample
+from evaluation.dataset import ExpectedBehavior, GoldenDatasetSample
 from kb_builder import tracing
 from support_assistant.assistant import AssistantSettings, SupportAssistant
 
@@ -62,7 +62,7 @@ class SampleResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
-def answer_all(samples: list[GoldenSample], settings: AssistantSettings) -> list[SampleResult]:
+def answer_all(samples: list[GoldenDatasetSample], settings: AssistantSettings) -> list[SampleResult]:
     """Run the assistant on every question, each in its own trace."""
     assistant = SupportAssistant(settings)
     results = []
@@ -73,7 +73,7 @@ def answer_all(samples: list[GoldenSample], settings: AssistantSettings) -> list
 
 
 @tracing.traced("eval.sample")
-def _answer(assistant: SupportAssistant, sample: GoldenSample) -> SampleResult:
+def _answer(assistant: SupportAssistant, sample: GoldenDatasetSample) -> SampleResult:
     tracing.update(input={"id": sample.id, "question": sample.user_input}, metadata={"category": sample.category})
     reply = assistant.ask(sample.user_input)
     return SampleResult(
